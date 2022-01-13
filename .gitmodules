@@ -1,0 +1,6 @@
+[submodule "src/cutf"]
+	path = src/cutf
+	url = https://github.com/enp1s0/cutf
+[submodule "src/wmma_extension"]
+	path = src/wmma_extension
+	url = https://github.com/wmmae/wmma_extension
