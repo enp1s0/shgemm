@@ -26,9 +26,9 @@ template<
 	class TC_T
 	>
 __device__ void shgemm_core(
+		float* const c_ptr,
 		const float* const a_ptr,
-		const half * const b_ptr,
-		float* const c_ptr
+		const half * const b_ptr
 		) {
 	constexpr unsigned num_submatrices = (SMEM_M / FRAG_M) * (SMEM_N / FRAG_N);
 	static_assert(num_submatrices * warp_size % BLOCK_SIZE == 0, "the number of reg-level sub matrices must be a multiple of (BLOCK_SIZE / warp_size)");
@@ -38,8 +38,8 @@ __device__ void shgemm_core(
 
 	for (unsigned matrix_id_offset = 0; matrix_id_offset < num_submatrices; matrix_id_offset += BLOCK_SIZE / warp_size) {
 		const unsigned matrix_id = matrix_id_offset + (threadIdx.x / warp_size);
-		const unsigned matrix_id_m = matrix_id_m % (SMEM_M / FRAG_M);
-		const unsigned matrix_id_n = matrix_id_m / (SMEM_M / FRAG_M);
+		const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
+		const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
 
 		mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, A_Policy> frag_c;
 		mtk::wmma::tcec::fill_zero(frag_c);
@@ -61,7 +61,7 @@ __device__ void shgemm_core(
 template <class T, unsigned SMEM_M, unsigned SMEM_N>
 struct dmem_loader_n {
 	__device__ void operator()(
-			T* const smem_ptr, const std::size_t lds,
+			T* const smem_ptr,
 			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
 			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
 			const T* const dmem_ptr, const std::size_t ldd
@@ -76,7 +76,7 @@ struct dmem_storer_n {
 			T* const dmem_ptr, const std::size_t ldd,
 			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
 			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
-			const T* const smem_ptr, const std::size_t lds,
+			const T* const smem_ptr,
 			const float alpha, const float beta
 			) {
 
@@ -122,12 +122,12 @@ __global__ void shgemm_kernel(
 		a_dram_loader(a_smem_ptr,
 				blockIdx.x * SMEM_M, block_k,
 				m, k,
-				a_smem_ptr, lda
+				a_ptr, lda
 				);
 		b_dram_loader(b_smem_ptr,
 				block_k, blockIdx.y * SMEM_N,
 				k, n,
-				b_smem_ptr, ldb
+				b_ptr, ldb
 				);
 		__syncthreads();
 
@@ -137,10 +137,10 @@ __global__ void shgemm_kernel(
 
 	__syncthreads();
 	C_DMEM_STORER c_dmem_storer;
-	c_dmem_storer(c_ptr,
+	c_dmem_storer(c_ptr, ldc,
 			blockIdx.y * SMEM_M, blockIdx.y * SMEM_N,
 			m, n,
-			c_smem_ptr, SMEM_M,
+			c_smem_ptr,
 			alpha, beta);
 }
 
@@ -169,28 +169,38 @@ void shgemm_tn(
 		const float* const a_ptr, const std::size_t lda,
 		const half * const b_ptr, const std::size_t ldb,
 		const float* const beta_ptr,
-		const float* const c_ptr, const std::size_t ldc
+		float* const c_ptr, const std::size_t ldc
 		) {
 	constexpr unsigned NUM_STAGES = 2;
 	constexpr unsigned SMEM_M = 128;
 	constexpr unsigned SMEM_N = 128;
 	constexpr unsigned SMEM_K = 128;
-	constexpr unsigned FRAG_M = 128;
-	constexpr unsigned FRAG_N = 128;
-	constexpr unsigned FRAG_K = 128;
+	constexpr unsigned FRAG_M = 32;
+	constexpr unsigned FRAG_N = 32;
+	constexpr unsigned FRAG_K = 64;
+	constexpr unsigned BLOCK_SIZE = 256;
+	using TC_T = half;
 
 	constexpr auto smem_size = get_shared_memory_size_in_byte(NUM_STAGES, SMEM_M, SMEM_N, SMEM_K);
-	const dim3 grid_size(1);
-	const dim3 block_size(1);
+	const dim3 grid_size((m + SMEM_M - 1) / SMEM_M, (n + SMEM_N - 1) / SMEM_N);
+	const dim3 block_size(BLOCK_SIZE);
 
-	shgemm_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, dmem_loader_n<float, SMEM_K, SMEM_M>, dmem_loader_n<half, SMEM_K, SMEM_N>>
+	shgemm_kernel<
+		SMEM_M, SMEM_N, SMEM_K,
+		FRAG_M, FRAG_N, FRAG_K,
+		dmem_loader_n<float, SMEM_K, SMEM_M>,
+		dmem_loader_n<half , SMEM_K, SMEM_N>,
+		dmem_storer_n<float, SMEM_M, SMEM_N>,
+		BLOCK_SIZE,
+		TC_T
+	>
 		<<<grid_size, block_size, smem_size, handle.cuda_stream>>>
 		(
 		 m, n, k,
-		 alpha_ptr,
+		 *alpha_ptr,
 		 a_ptr, lda,
 		 b_ptr, ldb,
-		 beta_ptr,
+		 *beta_ptr,
 		 c_ptr, ldc
 		 );
 }
@@ -214,7 +224,7 @@ void mtk::shgemm::shgemm(
 		const float* const a_ptr, const std::size_t lda,
 		const half * const b_ptr, const std::size_t ldb,
 		const float* const beta_ptr,
-		const float* const c_ptr, const std::size_t ldc
+		float* const c_ptr, const std::size_t ldc
 		) {
 	if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
 		shgemm_tn(
