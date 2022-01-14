@@ -91,17 +91,20 @@ template<
 	unsigned FRAG_N,
 	unsigned FRAG_K,
 	class A_DMEM_LOADER,
-	class B_DMEM_LOADER
+	class B_DMEM_LOADER,
+	class C_DMEM_STORER,
+	unsigned BLOCK_SIZE,
+	class TC_T
 	>
 __global__ void shgemm_kernel(
 		const std::size_t m,
 		const std::size_t n,
 		const std::size_t k,
-		const float* const alpha_ptr,
+		const float alpha,
 		const float* const a_ptr, const std::size_t lda,
 		const half * const b_ptr, const std::size_t ldb,
-		const float* const beta_ptr,
-		const float* const c_ptr, const std::size_t ldc
+		const float beta,
+		float* const c_ptr, const std::size_t ldc
 		) {
 	constexpr unsigned NUM_STAGES = 2;
 
@@ -110,8 +113,35 @@ __global__ void shgemm_kernel(
 	float* const c_smem_ptr = smem + NUM_STAGES * SMEM_M * SMEM_K;
 	half * const b_smem_ptr = reinterpret_cast<half*>(c_smem_ptr + SMEM_M * SMEM_N);
 
+	mem_fill_zero<SMEM_M * SMEM_N, BLOCK_SIZE>(c_smem_ptr);
+
 	A_DMEM_LOADER a_dram_loader;
 	B_DMEM_LOADER b_dram_loader;
+
+	for (std::size_t block_k = 0; block_k < k; block_k += SMEM_K) {
+		a_dram_loader(a_smem_ptr,
+				blockIdx.x * SMEM_M, block_k,
+				m, k,
+				a_smem_ptr, lda
+				);
+		b_dram_loader(b_smem_ptr,
+				block_k, blockIdx.y * SMEM_N,
+				k, n,
+				b_smem_ptr, ldb
+				);
+		__syncthreads();
+
+		shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>(c_smem_ptr, a_smem_ptr, b_smem_ptr);
+		__syncthreads();
+	}
+
+	__syncthreads();
+	C_DMEM_STORER c_dmem_storer;
+	c_dmem_storer(c_ptr,
+			blockIdx.y * SMEM_M, blockIdx.y * SMEM_N,
+			m, n,
+			c_smem_ptr, SMEM_M,
+			alpha, beta);
 }
 
 template <class T>
