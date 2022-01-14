@@ -17,6 +17,15 @@ struct dmem_loader_n {
 	}
 };
 
+template <unsigned SIZE, unsigned BLOCK_SIZE>
+__device__ void mem_fill_zero(
+		float* const ptr
+		) {
+	for (unsigned i = 0; i < SIZE; i += BLOCK_SIZE) {
+		ptr[i + threadIdx.x] = 0.f;
+	}
+}
+
 template<
 	unsigned SMEM_M,
 	unsigned SMEM_N,
