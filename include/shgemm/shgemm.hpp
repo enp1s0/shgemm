@@ -28,7 +28,7 @@ void shgemm(
 		const float* const a_ptr, const std::size_t lda,
 		const half * const b_ptr, const std::size_t ldb,
 		const float* const beta_ptr,
-		const float* const c_ptr, const std::size_t ldc
+		float* const c_ptr, const std::size_t ldc
 		);
 
 } // namespace shgemm
