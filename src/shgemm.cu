@@ -6,17 +6,6 @@
 namespace {
 constexpr unsigned warp_size = 32;
 
-template <class T, unsigned SMEM_M, unsigned SMEM_N>
-struct dmem_loader_n {
-	__device__ void operator()(
-			T* const smem_ptr, const std::size_t lds,
-			const std::size_t dmem_m, const std::size_t dmem_n,
-			const T* const dmem_ptr, const std::size_t ldd
-			) {
-
-	}
-};
-
 template <unsigned SIZE, unsigned BLOCK_SIZE>
 __device__ void mem_fill_zero(
 		float* const ptr
@@ -68,6 +57,31 @@ __device__ void shgemm_core(
 		mtk::wmma::tcec::store_matrix_sync(c_ptr + matrix_id_m * SMEM_N * FRAG_M + matrix_id_n * FRAG_N, frag_c, SMEM_N, nvcuda::wmma::mem_col_major);
 	}
 }
+
+template <class T, unsigned SMEM_M, unsigned SMEM_N>
+struct dmem_loader_n {
+	__device__ void operator()(
+			T* const smem_ptr, const std::size_t lds,
+			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
+			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const T* const dmem_ptr, const std::size_t ldd
+			) {
+
+	}
+};
+
+template <class T, unsigned SMEM_M, unsigned SMEM_N>
+struct dmem_storer_n {
+	__device__ void operator()(
+			T* const dmem_ptr, const std::size_t ldd,
+			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
+			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const T* const smem_ptr, const std::size_t lds,
+			const float alpha, const float beta
+			) {
+
+	}
+};
 
 template<
 	unsigned SMEM_M,
