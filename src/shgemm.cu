@@ -84,7 +84,7 @@ struct dmem_loader_n {
 				const auto dmem_index = m + n * ldd;
 
 				auto v = static_cast<T>(0);
-				if (m <= dmem_size_m && n <= dmem_size_n) {
+				if (m < dmem_size_m && n < dmem_size_n) {
 					v = dmem_ptr[dmem_index];
 				}
 
