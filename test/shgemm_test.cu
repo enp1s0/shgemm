@@ -129,4 +129,5 @@ int main() {
 			}
 		}
 	}
+	mtk::shgemm::destroy(shgemm_handle);
 }

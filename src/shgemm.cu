@@ -296,6 +296,11 @@ void mtk::shgemm::create(
 	handle.cuda_stream = 0;
 }
 
+void mtk::shgemm::destroy(
+		mtk::shgemm::shgemmHandle_t &handle
+		) {
+}
+
 void mtk::shgemm::set_cuda_stream(
 		mtk::shgemm::shgemmHandle_t &handle,
 		cudaStream_t const cuda_stream

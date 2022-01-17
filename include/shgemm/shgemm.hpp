@@ -15,6 +15,7 @@ struct shgemmHandle_t {
 };
 
 void create(shgemmHandle_t& handle);
+void destroy(shgemmHandle_t& handle);
 
 void set_cuda_stream(shgemmHandle_t& handle, cudaStream_t const cuda_stream);
 
