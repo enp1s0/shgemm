@@ -32,7 +32,6 @@ void test_shgemm_core(
 			c_fp32_ptr, m
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
-	return;
 
 	const auto [relative_max_error, residual] = mtk::mateval::cuda::max_relative_error_and_residual_AxB(
 			m, n, k,
