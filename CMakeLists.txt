@@ -58,8 +58,11 @@ foreach(test shgemm)
 	add_executable(${test_out} ${TESTSRCDIR}/${test}_test.cu ${HEADERS})
 	target_include_directories(${test_out} PRIVATE ${INCDIR})
 	target_include_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/include)
+	target_link_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/build)
+	target_link_libraries(${test_out} PRIVATE mateval_cuda)
 	target_link_libraries(${test_out} PRIVATE shgemm)
 	target_link_libraries(${test_out} PRIVATE
 		CUDA::cublas
+		CUDA::curand
 		)
 endforeach()
