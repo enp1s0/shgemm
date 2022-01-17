@@ -2,11 +2,10 @@
 #include <cutf/cuda.hpp>
 #include <wmma_extension/tcec/tcec.hpp>
 #include <cassert>
-#include "wmmae_shgemm.hpp"
+#include "shgemm_core.hpp"
+#include "dmem_accessor.hpp"
 
 namespace {
-constexpr unsigned warp_size = 32;
-
 template <unsigned SIZE, unsigned BLOCK_SIZE>
 __device__ void mem_fill_zero(
 		float* const ptr
@@ -23,148 +22,10 @@ template<
 	unsigned FRAG_M,
 	unsigned FRAG_N,
 	unsigned FRAG_K,
-	unsigned BLOCK_SIZE,
-	class TC_T
-	>
-__device__ void shgemm_core(
-		float* const c_ptr,
-		const float* const a_ptr,
-		const half * const b_ptr
-		) {
-	constexpr unsigned num_submatrices = (SMEM_M / FRAG_M) * (SMEM_N / FRAG_N);
-	static_assert(num_submatrices * warp_size % BLOCK_SIZE == 0, "the number of reg-level sub matrices must be a multiple of (BLOCK_SIZE / warp_size)");
-
-	using A_Policy = typename mtk::wmma::tcec::detail::default_policy<TC_T, mtk::wmma::tcec::op_with_error_correction   , mtk::wmma::tcec::op_mma>::type;
-	using B_Policy = typename mtk::wmma::tcec::detail::default_policy<TC_T, mtk::wmma::tcec::op_without_error_correction, mtk::wmma::tcec::op_mma>::type;
-
-	for (unsigned matrix_id_offset = 0; matrix_id_offset < num_submatrices; matrix_id_offset += BLOCK_SIZE / warp_size) {
-		const unsigned matrix_id = matrix_id_offset + (threadIdx.x / warp_size);
-		const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
-		const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
-
-		mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, A_Policy> frag_c;
-		mtk::wmma::tcec::load_matrix_sync(frag_c, c_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * SMEM_M, SMEM_M, nvcuda::wmma::mem_col_major);
-
-		for (unsigned k = 0; k < SMEM_K; k += FRAG_K) {
-			mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_a, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::row_major, A_Policy> frag_a;
-			mtk::wmma::tcec::load_matrix_sync(frag_a, a_ptr + matrix_id_m * FRAG_M * SMEM_K + k, SMEM_K);
-
-			mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_b, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::col_major, B_Policy> frag_b;
-			mtk::wmma::tcec::load_matrix_sync(frag_b, b_ptr + matrix_id_n * FRAG_N * SMEM_K + k, SMEM_K);
-
-			mtk::shgemm::mma_sync(frag_c, frag_a, frag_b, frag_c);
-		}
-
-		mtk::wmma::tcec::store_matrix_sync(c_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * SMEM_M, frag_c, SMEM_M, nvcuda::wmma::mem_col_major);
-	}
-}
-
-template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
-struct dmem_loader_n {
-	__device__ void operator()(
-			T* const smem_ptr,
-			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
-			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
-			const T* const dmem_ptr, const std::size_t ldd
-			) {
-		if (dmem_start_m + SMEM_M < dmem_size_m && dmem_size_n + SMEM_N < dmem_size_n) {
-			for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-				const auto i = i_offset + threadIdx.x;
-				const auto m = (i % SMEM_M) + dmem_start_m;
-				const auto n = (i / SMEM_M) + dmem_start_n;
-				const auto dmem_index = m + n * ldd;
-
-				smem_ptr[i] = dmem_ptr[dmem_index];
-			}
-		} else {
-			for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-				const auto i = i_offset + threadIdx.x;
-				const auto m = (i % SMEM_M) + dmem_start_m;
-				const auto n = (i / SMEM_M) + dmem_start_n;
-				const auto dmem_index = m + n * ldd;
-
-				auto v = static_cast<T>(0);
-				if (m < dmem_size_m && n < dmem_size_n) {
-					v = dmem_ptr[dmem_index];
-				}
-
-				smem_ptr[i] = v;
-			}
-		}
-	}
-};
-
-template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
-struct dmem_storer_n {
-	__device__ void operator()(
-			T* const dmem_ptr, const std::size_t ldd,
-			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
-			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
-			const T* const smem_ptr,
-			const float alpha, const float beta
-			) {
-		if (beta == 0.f) {
-			if (dmem_start_m + SMEM_M < dmem_size_m && dmem_size_n + SMEM_N < dmem_size_n) {
-				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-					const auto i = i_offset + threadIdx.x;
-					const auto m = (i % SMEM_M) + dmem_start_m;
-					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
-
-					dmem_ptr[dmem_index] = smem_ptr[i] * alpha;
-				}
-			} else {
-				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-					const auto i = i_offset + threadIdx.x;
-					const auto m = (i % SMEM_M) + dmem_start_m;
-					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
-
-					if (m >= dmem_size_m || n >= dmem_size_n) {
-						continue;
-					}
-
-					dmem_ptr[dmem_index] = smem_ptr[i] * alpha;
-				}
-			}
-		} else {
-			if (dmem_start_m + SMEM_M < dmem_size_m && dmem_size_n + SMEM_N < dmem_size_n) {
-				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-					const auto i = i_offset + threadIdx.x;
-					const auto m = (i % SMEM_M) + dmem_start_m;
-					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
-
-					dmem_ptr[dmem_index] = smem_ptr[i] * alpha + dmem_ptr[dmem_index] * beta;
-				}
-			} else {
-				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-					const auto i = i_offset + threadIdx.x;
-					const auto m = (i % SMEM_M) + dmem_start_m;
-					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
-
-					if (m >= dmem_size_m || n >= dmem_size_n) {
-						continue;
-					}
-
-					dmem_ptr[dmem_index] = smem_ptr[i] * alpha + dmem_ptr[dmem_index] * beta;
-				}
-			}
-		}
-	}
-};
-
-template<
-	unsigned SMEM_M,
-	unsigned SMEM_N,
-	unsigned SMEM_K,
-	unsigned FRAG_M,
-	unsigned FRAG_N,
-	unsigned FRAG_K,
 	class A_DMEM_LOADER,
 	class B_DMEM_LOADER,
 	class C_DMEM_STORER,
+	class SHGEMM_CORE,
 	unsigned BLOCK_SIZE,
 	class TC_T
 	>
@@ -189,6 +50,7 @@ __global__ void shgemm_kernel(
 
 	A_DMEM_LOADER a_dram_loader;
 	B_DMEM_LOADER b_dram_loader;
+	SHGEMM_CORE shgemm_core;
 
 	std::size_t block_k = 0;
 	a_dram_loader(a_smem_ptr,
@@ -216,14 +78,14 @@ __global__ void shgemm_kernel(
 				b_ptr, ldb
 				);
 
-		shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>(c_smem_ptr,
+		shgemm_core(c_smem_ptr,
 				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 				);
 		__syncthreads();
 	}
 
-	shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>(c_smem_ptr,
+	shgemm_core(c_smem_ptr,
 			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 			b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 			);
@@ -282,9 +144,10 @@ void shgemm_tn(
 				&(shgemm_kernel<
 					SMEM_M, SMEM_N, SMEM_K,
 					FRAG_M, FRAG_N, FRAG_K,
-					dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>,
-					dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
-					dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
+					mtk::shgemm::device::dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>,
+					mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
+					mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
+					mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>,
 					BLOCK_SIZE,
 					TC_T
 					>)
@@ -293,9 +156,10 @@ void shgemm_tn(
 	shgemm_kernel<
 		SMEM_M, SMEM_N, SMEM_K,
 		FRAG_M, FRAG_N, FRAG_K,
-		dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>,
-		dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
-		dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
+		mtk::shgemm::device::dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>,
+		mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
+		mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
+		mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>,
 		BLOCK_SIZE,
 		TC_T
 	>
