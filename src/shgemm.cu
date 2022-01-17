@@ -55,7 +55,7 @@ __device__ void shgemm_core(
 			mtk::shgemm::mma_sync(frag_c, frag_a, frag_b, frag_c);
 		}
 
-		mtk::wmma::tcec::store_matrix_sync(c_ptr + matrix_id_m * SMEM_N * FRAG_M + matrix_id_n * FRAG_N, frag_c, SMEM_N, nvcuda::wmma::mem_col_major);
+		mtk::wmma::tcec::store_matrix_sync(c_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * SMEM_M, frag_c, SMEM_M, nvcuda::wmma::mem_col_major);
 	}
 }
 
@@ -84,7 +84,7 @@ struct dmem_loader_n {
 				const auto dmem_index = m + n * ldd;
 
 				auto v = static_cast<T>(0);
-				if (m >= dmem_size_m || n >= dmem_size_n) {
+				if (m <= dmem_size_m && n <= dmem_size_n) {
 					v = dmem_ptr[dmem_index];
 				}
 
@@ -210,7 +210,7 @@ __global__ void shgemm_kernel(
 	__syncthreads();
 	C_DMEM_STORER c_dmem_storer;
 	c_dmem_storer(c_ptr, ldc,
-			blockIdx.y * SMEM_M, blockIdx.y * SMEM_N,
+			blockIdx.x * SMEM_M, blockIdx.y * SMEM_N,
 			m, n,
 			c_smem_ptr,
 			alpha, beta);
