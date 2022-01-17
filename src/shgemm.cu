@@ -1,4 +1,5 @@
 #include <shgemm/shgemm.hpp>
+#include <cutf/cuda.hpp>
 #include <wmma_extension/tcec/tcec.hpp>
 #include <cassert>
 #include "wmmae_shgemm.hpp"
@@ -243,10 +244,10 @@ void shgemm_tn(
 		float* const c_ptr, const std::size_t ldc
 		) {
 	constexpr unsigned NUM_STAGES = 2;
-	constexpr unsigned SMEM_M = 128;
-	constexpr unsigned SMEM_N = 128;
-	constexpr unsigned SMEM_K = 128;
-	constexpr unsigned FRAG_M = 32;
+	constexpr unsigned SMEM_M = 64;
+	constexpr unsigned SMEM_N = 64;
+	constexpr unsigned SMEM_K = 64;
+	constexpr unsigned FRAG_M = 16;
 	constexpr unsigned FRAG_N = 32;
 	constexpr unsigned FRAG_K = 64;
 	constexpr unsigned BLOCK_SIZE = 256;
@@ -255,6 +256,18 @@ void shgemm_tn(
 	constexpr auto smem_size = get_shared_memory_size_in_byte(NUM_STAGES, SMEM_M, SMEM_N, SMEM_K);
 	const dim3 grid_size((m + SMEM_M - 1) / SMEM_M, (n + SMEM_N - 1) / SMEM_N);
 	const dim3 block_size(BLOCK_SIZE);
+
+	CUTF_CHECK_ERROR(cudaFuncSetAttribute(
+				&(shgemm_kernel<
+					SMEM_M, SMEM_N, SMEM_K,
+					FRAG_M, FRAG_N, FRAG_K,
+					dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>,
+					dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
+					dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
+					BLOCK_SIZE,
+					TC_T
+					>)
+				, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
 
 	shgemm_kernel<
 		SMEM_M, SMEM_N, SMEM_K,
