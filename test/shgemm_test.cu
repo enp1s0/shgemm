@@ -6,7 +6,7 @@
 #include <mateval/comparison_cuda.hpp>
 #include <shgemm/shgemm.hpp>
 
-constexpr std::size_t test_count = 1lu << 13;
+constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 6;
 constexpr std::size_t max_log_DIM = 14;
 
@@ -57,7 +57,7 @@ void test_shgemm_core(
 	}
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 	const auto end_clock = std::chrono::system_clock::now();
-	const auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() * 1e-6;
+	const auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() * 1e-6 / test_count;
 
 	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
 
