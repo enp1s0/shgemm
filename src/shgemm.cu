@@ -290,6 +290,12 @@ void shgemm_tn(
 }
 } // noname namespace
 
+void mtk::shgemm::create(
+		mtk::shgemm::shgemmHandle_t &handle
+		) {
+	handle.cuda_stream = 0;
+}
+
 void mtk::shgemm::set_cuda_stream(
 		mtk::shgemm::shgemmHandle_t &handle,
 		cudaStream_t const cuda_stream
