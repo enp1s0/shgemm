@@ -112,6 +112,8 @@ int main() {
 
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
+
+	std::printf("m,n,k,residual,relative_max_error,throughput_in_tflops\n");
 	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M++) {
 		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N++) {
 			for (std::size_t log_K = min_log_DIM; log_K <= max_log_DIM; log_K++) {
