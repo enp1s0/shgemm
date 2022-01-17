@@ -43,7 +43,7 @@ __device__ void shgemm_core(
 		const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
 
 		mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, A_Policy> frag_c;
-		mtk::wmma::tcec::fill_zero(frag_c);
+		mtk::wmma::tcec::load_matrix_sync(frag_c, c_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * SMEM_M, SMEM_M, nvcuda::wmma::mem_col_major);
 
 		for (unsigned k = 0; k < SMEM_K; k += FRAG_K) {
 			mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_a, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::row_major, A_Policy> frag_a;
@@ -192,8 +192,8 @@ __global__ void shgemm_kernel(
 
 	for (std::size_t block_k = 0; block_k < k; block_k += SMEM_K) {
 		a_dram_loader(a_smem_ptr,
-				blockIdx.x * SMEM_M, block_k,
-				m, k,
+				block_k, blockIdx.x * SMEM_M,
+				k, m,
 				a_ptr, lda
 				);
 		b_dram_loader(b_smem_ptr,
