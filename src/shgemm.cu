@@ -265,12 +265,12 @@ void shgemm_tn(
 		float* const c_ptr, const std::size_t ldc
 		) {
 	constexpr unsigned NUM_STAGES = 2;
-	constexpr unsigned SMEM_M = 64;
+	constexpr unsigned SMEM_M = 128;
 	constexpr unsigned SMEM_N = 64;
 	constexpr unsigned SMEM_K = 64;
-	constexpr unsigned FRAG_M = 16;
+	constexpr unsigned FRAG_M = 32;
 	constexpr unsigned FRAG_N = 32;
-	constexpr unsigned FRAG_K = 64;
+	constexpr unsigned FRAG_K = 16;
 	constexpr unsigned BLOCK_SIZE = 256;
 	using TC_T = half;
 
