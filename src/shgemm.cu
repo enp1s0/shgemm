@@ -190,22 +190,43 @@ __global__ void shgemm_kernel(
 	A_DMEM_LOADER a_dram_loader;
 	B_DMEM_LOADER b_dram_loader;
 
-	for (std::size_t block_k = 0; block_k < k; block_k += SMEM_K) {
-		a_dram_loader(a_smem_ptr,
+	std::size_t block_k = 0;
+	a_dram_loader(a_smem_ptr,
+			block_k, blockIdx.x * SMEM_M,
+			k, m,
+			a_ptr, lda
+			);
+	b_dram_loader(b_smem_ptr,
+			block_k, blockIdx.y * SMEM_N,
+			k, n,
+			b_ptr, ldb
+			);
+	block_k += SMEM_K;
+	__syncthreads();
+
+	for (; block_k < k; block_k += SMEM_K) {
+		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_M,
 				block_k, blockIdx.x * SMEM_M,
 				k, m,
 				a_ptr, lda
 				);
-		b_dram_loader(b_smem_ptr,
+		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_N,
 				block_k, blockIdx.y * SMEM_N,
 				k, n,
 				b_ptr, ldb
 				);
-		__syncthreads();
 
-		shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>(c_smem_ptr, a_smem_ptr, b_smem_ptr);
+		shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>(c_smem_ptr,
+				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
+				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
+				);
 		__syncthreads();
 	}
+
+	shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>(c_smem_ptr,
+			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
+			b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
+			);
 
 	__syncthreads();
 	C_DMEM_STORER c_dmem_storer;
