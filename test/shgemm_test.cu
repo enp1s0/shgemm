@@ -7,8 +7,9 @@
 #include <shgemm/shgemm.hpp>
 
 constexpr std::size_t test_count = 1lu << 6;
-constexpr std::size_t min_log_DIM = 6;
+constexpr std::size_t min_log_DIM = 5;
 constexpr std::size_t max_log_DIM = 14;
+constexpr std::size_t log_DIM_interval = 3;
 
 void test_shgemm_core(
 		mtk::shgemm::shgemmHandle_t shgemm_handle,
@@ -114,9 +115,9 @@ int main() {
 	mtk::shgemm::create(shgemm_handle);
 
 	std::printf("m,n,k,residual,relative_max_error,throughput_in_tflops\n");
-	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M++) {
-		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N++) {
-			for (std::size_t log_K = min_log_DIM; log_K <= max_log_DIM; log_K++) {
+	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
+		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
+			for (std::size_t log_K = min_log_DIM; log_K <= max_log_DIM; log_K += log_DIM_interval) {
 				const auto m = 1lu << log_M;
 				const auto n = 1lu << log_N;
 				const auto k = 1lu << log_K;
