@@ -16,6 +16,7 @@ struct dmem_loader_n {
 			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
 			const T* const dmem_ptr, const std::size_t ldd
 			) {
+		static_assert(SMEM_M * SMEM_N >= BLOCK_SIZE * 8, "SMEM_M * SMEM_N >= BLOCK_SIZE must be satisfied");
 		if (dmem_start_m + SMEM_M <= dmem_size_m && dmem_start_n + SMEM_N <= dmem_size_n) {
 			if (ldd & 0x3 == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
