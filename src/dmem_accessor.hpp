@@ -141,14 +141,44 @@ struct dmem_storer_n {
 			const float alpha, const float beta
 			) {
 		if (beta == 0.f) {
-			if (dmem_start_m + SMEM_M < dmem_size_m && dmem_size_n + SMEM_N < dmem_size_n) {
-				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-					const auto i = i_offset + threadIdx.x;
-					const auto m = (i % SMEM_M) + dmem_start_m;
-					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+			if (dmem_start_m + SMEM_M < dmem_size_m && dmem_start_n + SMEM_N < dmem_size_n) {
+				if (ldd & 0x3 == 0) {
+					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
+						const auto i = i_offset + threadIdx.x * 4;
+						const auto m = (i % SMEM_M) + dmem_start_m;
+						const auto n = (i / SMEM_M) + dmem_start_n;
+						const auto dmem_index = m + n * ldd;
 
-					dmem_ptr[dmem_index] = smem_ptr[i] * alpha;
+						// 128 bit memory access
+						auto v = *reinterpret_cast<const float4*>(&smem_ptr[i]);
+						v.x *= alpha;
+						v.y *= alpha;
+						v.z *= alpha;
+						v.w *= alpha;
+						*reinterpret_cast<float4*>(&dmem_ptr[dmem_index]) = v;
+					}
+				} else if (ldd & 0x1 == 0) {
+					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
+						const auto i = i_offset + threadIdx.x * 2;
+						const auto m = (i % SMEM_M) + dmem_start_m;
+						const auto n = (i / SMEM_M) + dmem_start_n;
+						const auto dmem_index = m + n * ldd;
+
+						// 64 bit memory access
+						auto v = *reinterpret_cast<const float2*>(&smem_ptr[i]);
+						v.x *= alpha;
+						v.y *= alpha;
+						*reinterpret_cast<float2*>(&dmem_ptr[dmem_index]) = v;
+					}
+				} else {
+					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
+						const auto i = i_offset + threadIdx.x;
+						const auto m = (i % SMEM_M) + dmem_start_m;
+						const auto n = (i / SMEM_M) + dmem_start_n;
+						const auto dmem_index = m + n * ldd;
+
+						dmem_ptr[dmem_index] = smem_ptr[i] * alpha;
+					}
 				}
 			} else {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
@@ -165,14 +195,46 @@ struct dmem_storer_n {
 				}
 			}
 		} else {
-			if (dmem_start_m + SMEM_M < dmem_size_m && dmem_size_n + SMEM_N < dmem_size_n) {
-				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-					const auto i = i_offset + threadIdx.x;
-					const auto m = (i % SMEM_M) + dmem_start_m;
-					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+			if (dmem_start_m + SMEM_M < dmem_size_m && dmem_start_n + SMEM_N < dmem_size_n) {
+				if (ldd & 0x3 == 0) {
+					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
+						const auto i = i_offset + threadIdx.x * 4;
+						const auto m = (i % SMEM_M) + dmem_start_m;
+						const auto n = (i / SMEM_M) + dmem_start_n;
+						const auto dmem_index = m + n * ldd;
 
-					dmem_ptr[dmem_index] = smem_ptr[i] * alpha + dmem_ptr[dmem_index] * beta;
+						// 128 bit memory access
+						auto v = *reinterpret_cast<const float4*>(&smem_ptr[i]);
+						const auto w = *reinterpret_cast<float4*>(&dmem_ptr[dmem_index]);
+						v.x = v.x * alpha + w.x * beta;
+						v.y = v.y * alpha + w.y * beta;
+						v.z = v.z * alpha + w.z * beta;
+						v.w = v.w * alpha + w.w * beta;
+						*reinterpret_cast<float4*>(&dmem_ptr[dmem_index]) = v;
+					}
+				} else if (ldd & 0x1 == 0) {
+					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
+						const auto i = i_offset + threadIdx.x * 2;
+						const auto m = (i % SMEM_M) + dmem_start_m;
+						const auto n = (i / SMEM_M) + dmem_start_n;
+						const auto dmem_index = m + n * ldd;
+
+						// 64 bit memory access
+						auto v = *reinterpret_cast<const float2*>(&smem_ptr[i]);
+						const auto w = *reinterpret_cast<float2*>(&dmem_ptr[dmem_index]);
+						v.x = v.x * alpha + w.x * beta;
+						v.y = v.y * alpha + w.y * beta;
+						*reinterpret_cast<float2*>(&dmem_ptr[dmem_index]) = v;
+					}
+				} else {
+					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
+						const auto i = i_offset + threadIdx.x;
+						const auto m = (i % SMEM_M) + dmem_start_m;
+						const auto n = (i / SMEM_M) + dmem_start_n;
+						const auto dmem_index = m + n * ldd;
+
+						dmem_ptr[dmem_index] = smem_ptr[i] * alpha + dmem_ptr[dmem_index] + beta;
+					}
 				}
 			} else {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
