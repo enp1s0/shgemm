@@ -68,6 +68,7 @@ void test_shgemm_core(
 			relative_max_error,
 			throughput
 			);
+	std::fflush(stdout);
 }
 
 __global__ void convert_B_to_fp16_kernel(
@@ -115,6 +116,7 @@ int main() {
 	mtk::shgemm::create(shgemm_handle);
 
 	std::printf("m,n,k,residual,relative_max_error,throughput_in_tflops\n");
+	std::fflush(stdout);
 	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
 		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
 			for (std::size_t log_K = min_log_DIM; log_K <= max_log_DIM; log_K += log_DIM_interval) {
