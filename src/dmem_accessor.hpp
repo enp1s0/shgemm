@@ -15,13 +15,24 @@ struct dmem_loader_n {
 			const T* const dmem_ptr, const std::size_t ldd
 			) {
 		if (dmem_start_m + SMEM_M < dmem_size_m && dmem_size_n + SMEM_N < dmem_size_n) {
-			for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
-				const auto i = i_offset + threadIdx.x;
-				const auto m = (i % SMEM_M) + dmem_start_m;
-				const auto n = (i / SMEM_M) + dmem_start_n;
-				const auto dmem_index = m + n * ldd;
+			if (ldd & 0x1 == 0) {
+				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
+					const auto i = i_offset + threadIdx.x * 2;
+					const auto m = (i % SMEM_M) + dmem_start_m;
+					const auto n = (i / SMEM_M) + dmem_start_n;
+					const auto dmem_index = m + n * ldd;
 
-				smem_ptr[i] = dmem_ptr[dmem_index];
+					*reinterpret_cast<half2*>(&smem_ptr[i]) = *reinterpret_cast<const half2*>(&dmem_ptr[dmem_index]);
+				}
+			} else {
+				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
+					const auto i = i_offset + threadIdx.x;
+					const auto m = (i % SMEM_M) + dmem_start_m;
+					const auto n = (i / SMEM_M) + dmem_start_n;
+					const auto dmem_index = m + n * ldd;
+
+					smem_ptr[i] = dmem_ptr[dmem_index];
+				}
 			}
 		} else {
 			for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
