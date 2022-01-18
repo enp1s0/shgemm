@@ -28,7 +28,6 @@ struct dmem_loader_n {
 
 					// 128 bit memory access
 					cutf::cp_async::cp_async<16>(&smem_ptr[i], &dmem_ptr[dmem_index]);
-					cutf::cp_async::commit();
 				}
 			} else if (ldd & 0x1 == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
@@ -39,7 +38,6 @@ struct dmem_loader_n {
 
 					// 64 bit memory access
 					cutf::cp_async::cp_async<8>(&smem_ptr[i], &dmem_ptr[dmem_index]);
-					cutf::cp_async::commit();
 				}
 			} else {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
@@ -49,7 +47,6 @@ struct dmem_loader_n {
 					const auto dmem_index = m + n * ldd;
 
 					cutf::cp_async::cp_async<4>(&smem_ptr[i], &dmem_ptr[dmem_index]);
-					cutf::cp_async::commit();
 				}
 			}
 		} else {
@@ -59,14 +56,14 @@ struct dmem_loader_n {
 				const auto n = (i / SMEM_M) + dmem_start_n;
 				const auto dmem_index = m + n * ldd;
 
-				auto v = static_cast<T>(0);
 				if (m < dmem_size_m && n < dmem_size_n) {
-					v = dmem_ptr[dmem_index];
+					cutf::cp_async::cp_async<4>(&smem_ptr[i], &dmem_ptr[dmem_index]);
+				} else {
+					smem_ptr[i] = 0.f;
 				}
-
-				smem_ptr[i] = v;
 			}
 		}
+		cutf::cp_async::commit();
 	}
 };
 
@@ -88,7 +85,6 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto dmem_index = m + n * ldd;
 
 					cutf::cp_async::cp_async<16>(&smem_ptr[i], &dmem_ptr[dmem_index]);
-					cutf::cp_async::commit();
 				}
 			} else if (ldd & 0x3 == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
@@ -98,7 +94,6 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto dmem_index = m + n * ldd;
 
 					cutf::cp_async::cp_async<8>(&smem_ptr[i], &dmem_ptr[dmem_index]);
-					cutf::cp_async::commit();
 				}
 			} else if (ldd & 0x1 == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
@@ -108,7 +103,6 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto dmem_index = m + n * ldd;
 
 					cutf::cp_async::cp_async<4>(&smem_ptr[i], &dmem_ptr[dmem_index]);
-					cutf::cp_async::commit();
 				}
 			} else {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
@@ -135,6 +129,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 				smem_ptr[i] = v;
 			}
 		}
+		cutf::cp_async::commit();
 	}
 };
 
