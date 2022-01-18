@@ -1,5 +1,6 @@
 #include <shgemm/shgemm.hpp>
 #include <cutf/cuda.hpp>
+#include <cutf/cp_async.hpp>
 #include <wmma_extension/tcec/tcec.hpp>
 #include <cassert>
 #include "shgemm_core.hpp"
@@ -64,6 +65,7 @@ __global__ void shgemm_kernel(
 			b_ptr, ldb
 			);
 	block_k += SMEM_K;
+	cutf::cp_async::wait_all();
 	__syncthreads();
 
 	for (; block_k < k; block_k += SMEM_K) {
@@ -82,6 +84,7 @@ __global__ void shgemm_kernel(
 				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 				);
+	cutf::cp_async::wait_all();
 		__syncthreads();
 	}
 
