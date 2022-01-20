@@ -37,6 +37,7 @@ target_link_libraries(${lib_name} PRIVATE
 
 set_target_properties(${lib_name} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_target_properties(${lib_name} PROPERTIES PUBLIC_HEADER ${INCDIR}/shgemm/${library}.hpp)
+target_compile_options(${lib_name} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v>)
 
 ##########################################################################
 # Installing
