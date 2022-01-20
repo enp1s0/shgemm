@@ -132,11 +132,11 @@ void shgemm_tn(
 	constexpr unsigned NUM_STAGES = 2;
 	constexpr unsigned SMEM_M = 128;
 	constexpr unsigned SMEM_N = 64;
-	constexpr unsigned SMEM_K = 64;
+	constexpr unsigned SMEM_K = 32;
 	constexpr unsigned FRAG_M = 32;
-	constexpr unsigned FRAG_N = 32;
+	constexpr unsigned FRAG_N = 64;
 	constexpr unsigned FRAG_K = 16;
-	constexpr unsigned BLOCK_SIZE = 256;
+	constexpr unsigned BLOCK_SIZE = 128;
 	using TC_T = half;
 
 	constexpr auto smem_size = get_shared_memory_size_in_byte(NUM_STAGES, SMEM_M, SMEM_N, SMEM_K);
