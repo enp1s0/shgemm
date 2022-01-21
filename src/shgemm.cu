@@ -27,6 +27,7 @@ template<
 	class B_DMEM_LOADER,
 	class C_DMEM_STORER,
 	class SHGEMM_CORE,
+	unsigned NUM_STAGES,
 	unsigned BLOCK_SIZE,
 	class TC_T
 	>
@@ -40,14 +41,11 @@ __global__ void shgemm_kernel(
 		const float beta,
 		float* const c_ptr, const std::size_t ldc
 		) {
-	constexpr unsigned NUM_STAGES = 2;
 
 	extern __shared__ float smem[];
 	float* const a_smem_ptr = smem;
-	float* const c_smem_ptr = smem + NUM_STAGES * SMEM_M * SMEM_K;
+	float* const c_smem_ptr = smem;
 	half * const b_smem_ptr = reinterpret_cast<half*>(c_smem_ptr + SMEM_M * SMEM_N);
-
-	mem_fill_zero<SMEM_M * SMEM_N, BLOCK_SIZE>(c_smem_ptr);
 
 	A_DMEM_LOADER a_dram_loader;
 	B_DMEM_LOADER b_dram_loader;
@@ -65,9 +63,17 @@ __global__ void shgemm_kernel(
 			b_ptr, ldb
 			);
 	block_k += SMEM_K;
+
+	// Initialize frag C
+	constexpr unsigned frag_c_length = (SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size);
+	mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[frag_c_length];
+	for (unsigned i = 0; i < frag_c_length; i++) {
+		mtk::wmma::tcec::fill_zero(frag_c[i]);
+	}
+
+	// MMA
 	cutf::cp_async::wait_all();
 	__syncthreads();
-
 	for (; block_k < k; block_k += SMEM_K) {
 		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_M,
 				block_k, blockIdx.y * SMEM_M,
@@ -80,19 +86,30 @@ __global__ void shgemm_kernel(
 				b_ptr, ldb
 				);
 
-		shgemm_core(c_smem_ptr,
+		shgemm_core(frag_c,
 				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 				);
-	cutf::cp_async::wait_all();
+		cutf::cp_async::wait_all();
 		__syncthreads();
 	}
 
-	shgemm_core(c_smem_ptr,
+	shgemm_core(frag_c,
 			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 			b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 			);
 
+	// Store frag C to smem
+	__syncthreads();
+	constexpr unsigned num_submatrices = (SMEM_M / FRAG_M) * (SMEM_N / FRAG_N);
+	for (unsigned matrix_id_offset = 0; matrix_id_offset < num_submatrices; matrix_id_offset += BLOCK_SIZE / mtk::shgemm::utils::warp_size) {
+		const unsigned matrix_id = matrix_id_offset + (threadIdx.x / mtk::shgemm::utils::warp_size);
+		const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
+		const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
+		mtk::wmma::tcec::store_matrix_sync(c_smem_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * SMEM_M, frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)], SMEM_M, nvcuda::wmma::mem_col_major);
+	}
+
+	// Store smem C to dmem
 	__syncthreads();
 	C_DMEM_STORER c_dmem_storer;
 	c_dmem_storer(c_ptr, ldc,
@@ -113,9 +130,9 @@ constexpr unsigned get_shared_memory_size_in_byte(
 		const unsigned SMEM_N,
 		const unsigned SMEM_K
 		) {
-	return NUM_STAGES * SMEM_M * SMEM_K * size_of<float> +
-		NUM_STAGES * SMEM_K * SMEM_N * size_of<half> +
-		SMEM_M * SMEM_N * size_of<float>;
+	return std::max(NUM_STAGES * SMEM_M * SMEM_K * size_of<float> +
+		NUM_STAGES * SMEM_K * SMEM_N * size_of<half>,
+		SMEM_M * SMEM_N * size_of<float>);
 }
 
 void shgemm_tn(
@@ -139,6 +156,11 @@ void shgemm_tn(
 	constexpr unsigned BLOCK_SIZE = 128;
 	using TC_T = half;
 
+	using A_DMEM_LOADER = mtk::shgemm::device::dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>;
+	using B_DMEM_LOADER = mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>;
+	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
+	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>;
+
 	constexpr auto smem_size = get_shared_memory_size_in_byte(NUM_STAGES, SMEM_M, SMEM_N, SMEM_K);
 	const dim3 grid_size((n + SMEM_N - 1) / SMEM_N, (m + SMEM_M - 1) / SMEM_M);
 	const dim3 block_size(BLOCK_SIZE);
@@ -147,10 +169,11 @@ void shgemm_tn(
 				&(shgemm_kernel<
 					SMEM_M, SMEM_N, SMEM_K,
 					FRAG_M, FRAG_N, FRAG_K,
-					mtk::shgemm::device::dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>,
-					mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
-					mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
-					mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>,
+					A_DMEM_LOADER,
+					B_DMEM_LOADER,
+					C_DMEM_STORER,
+					SHGEMM_CORE,
+					NUM_STAGES,
 					BLOCK_SIZE,
 					TC_T
 					>)
@@ -159,10 +182,11 @@ void shgemm_tn(
 	shgemm_kernel<
 		SMEM_M, SMEM_N, SMEM_K,
 		FRAG_M, FRAG_N, FRAG_K,
-		mtk::shgemm::device::dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>,
-		mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
-		mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
-		mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>,
+		A_DMEM_LOADER,
+		B_DMEM_LOADER,
+		C_DMEM_STORER,
+		SHGEMM_CORE,
+		NUM_STAGES,
 		BLOCK_SIZE,
 		TC_T
 	>
