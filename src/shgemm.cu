@@ -27,6 +27,7 @@ template<
 	class B_DMEM_LOADER,
 	class C_DMEM_STORER,
 	class SHGEMM_CORE,
+	unsigned NUM_STAGES,
 	unsigned BLOCK_SIZE,
 	class TC_T
 	>
@@ -40,11 +41,10 @@ __global__ void shgemm_kernel(
 		const float beta,
 		float* const c_ptr, const std::size_t ldc
 		) {
-	constexpr unsigned NUM_STAGES = 2;
 
 	extern __shared__ float smem[];
 	float* const a_smem_ptr = smem;
-	float* const c_smem_ptr = smem + NUM_STAGES * SMEM_M * SMEM_K;
+	float* const c_smem_ptr = smem;
 	half * const b_smem_ptr = reinterpret_cast<half*>(c_smem_ptr + SMEM_M * SMEM_N);
 
 	A_DMEM_LOADER a_dram_loader;
@@ -130,9 +130,9 @@ constexpr unsigned get_shared_memory_size_in_byte(
 		const unsigned SMEM_N,
 		const unsigned SMEM_K
 		) {
-	return NUM_STAGES * SMEM_M * SMEM_K * size_of<float> +
-		NUM_STAGES * SMEM_K * SMEM_N * size_of<half> +
-		SMEM_M * SMEM_N * size_of<float>;
+	return std::max(NUM_STAGES * SMEM_M * SMEM_K * size_of<float> +
+		NUM_STAGES * SMEM_K * SMEM_N * size_of<half>,
+		SMEM_M * SMEM_N * size_of<float>);
 }
 
 void shgemm_tn(
@@ -168,6 +168,7 @@ void shgemm_tn(
 					mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
 					mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
 					mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>,
+					NUM_STAGES,
 					BLOCK_SIZE,
 					TC_T
 					>)
@@ -180,6 +181,7 @@ void shgemm_tn(
 		mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>,
 		mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>,
 		mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>,
+		NUM_STAGES,
 		BLOCK_SIZE,
 		TC_T
 	>
