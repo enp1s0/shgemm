@@ -47,8 +47,6 @@ __global__ void shgemm_kernel(
 	float* const c_smem_ptr = smem + NUM_STAGES * SMEM_M * SMEM_K;
 	half * const b_smem_ptr = reinterpret_cast<half*>(c_smem_ptr + SMEM_M * SMEM_N);
 
-	mem_fill_zero<SMEM_M * SMEM_N, BLOCK_SIZE>(c_smem_ptr);
-
 	A_DMEM_LOADER a_dram_loader;
 	B_DMEM_LOADER b_dram_loader;
 	SHGEMM_CORE shgemm_core;
@@ -66,8 +64,16 @@ __global__ void shgemm_kernel(
 			);
 	block_k += SMEM_K;
 	cutf::cp_async::wait_all();
-	__syncthreads();
 
+	// Initialize frag C
+	constexpr unsigned frag_c_length = (SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size);
+	mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[frag_c_length];
+	for (unsigned i = 0; i < frag_c_length; i++) {
+		mtk::wmma::tcec::fill_zero(frag_c[i]);
+	}
+
+	// MMA
+	__syncthreads();
 	for (; block_k < k; block_k += SMEM_K) {
 		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_M,
 				block_k, blockIdx.y * SMEM_M,
@@ -80,19 +86,30 @@ __global__ void shgemm_kernel(
 				b_ptr, ldb
 				);
 
-		shgemm_core(c_smem_ptr,
+		shgemm_core(frag_c,
 				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 				);
-	cutf::cp_async::wait_all();
+		cutf::cp_async::wait_all();
 		__syncthreads();
 	}
 
-	shgemm_core(c_smem_ptr,
+	shgemm_core(frag_c,
 			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 			b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 			);
 
+	// Store frag C to smem
+	__syncthreads();
+	constexpr unsigned num_submatrices = (SMEM_M / FRAG_M) * (SMEM_N / FRAG_N);
+	for (unsigned matrix_id_offset = 0; matrix_id_offset < num_submatrices; matrix_id_offset += BLOCK_SIZE / mtk::shgemm::utils::warp_size) {
+		const unsigned matrix_id = matrix_id_offset + (threadIdx.x / mtk::shgemm::utils::warp_size);
+		const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
+		const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
+		mtk::wmma::tcec::store_matrix_sync(c_smem_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * SMEM_M, frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)], SMEM_M, nvcuda::wmma::mem_col_major);
+	}
+
+	// Store smem C to dmem
 	__syncthreads();
 	C_DMEM_STORER c_dmem_storer;
 	c_dmem_storer(c_ptr, ldc,
