@@ -63,7 +63,6 @@ __global__ void shgemm_kernel(
 			b_ptr, ldb
 			);
 	block_k += SMEM_K;
-	cutf::cp_async::wait_all();
 
 	// Initialize frag C
 	constexpr unsigned frag_c_length = (SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size);
@@ -73,6 +72,7 @@ __global__ void shgemm_kernel(
 	}
 
 	// MMA
+	cutf::cp_async::wait_all();
 	__syncthreads();
 	for (; block_k < k; block_k += SMEM_K) {
 		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_M,
