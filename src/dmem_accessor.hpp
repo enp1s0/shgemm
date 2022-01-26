@@ -9,6 +9,9 @@ namespace mtk {
 namespace shgemm {
 namespace device {
 
+// -----------------------------------------
+// N - loader
+// -----------------------------------------
 template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_loader_n {
 	__device__ void operator()(
@@ -19,7 +22,7 @@ struct dmem_loader_n {
 			) {
 		static_assert(SMEM_M * SMEM_N >= BLOCK_SIZE * 8, "SMEM_M * SMEM_N >= BLOCK_SIZE must be satisfied");
 		if (dmem_start_m + SMEM_M <= dmem_size_m && dmem_start_n + SMEM_N <= dmem_size_n) {
-			if (ldd & 0x3 == 0) {
+			if ((ldd & 0x3) == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
 					const auto i = i_offset + threadIdx.x * 4;
 					const auto m = (i % SMEM_M) + dmem_start_m;
@@ -29,7 +32,7 @@ struct dmem_loader_n {
 					// 128 bit memory access
 					cutf::cp_async::cp_async<16>(&smem_ptr[i], &dmem_ptr[dmem_index]);
 				}
-			} else if (ldd & 0x1 == 0) {
+			} else if ((ldd & 0x1) == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
 					const auto i = i_offset + threadIdx.x * 2;
 					const auto m = (i % SMEM_M) + dmem_start_m;
@@ -77,7 +80,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 			) {
 		static_assert(SMEM_M * SMEM_N >= BLOCK_SIZE * 8, "SMEM_M * SMEM_N >= BLOCK_SIZE must be satisfied");
 		if (dmem_start_m + SMEM_M <= dmem_size_m && dmem_start_n + SMEM_N <= dmem_size_n) {
-			if (ldd & 0x7 == 0) {
+			if ((ldd & 0x7) == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 8) {
 					const auto i = i_offset + threadIdx.x * 8;
 					const auto m = (i % SMEM_M) + dmem_start_m;
@@ -86,7 +89,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 
 					cutf::cp_async::cp_async<16>(&smem_ptr[i], &dmem_ptr[dmem_index]);
 				}
-			} else if (ldd & 0x3 == 0) {
+			} else if ((ldd & 0x3) == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
 					const auto i = i_offset + threadIdx.x * 4;
 					const auto m = (i % SMEM_M) + dmem_start_m;
@@ -95,7 +98,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 
 					cutf::cp_async::cp_async<8>(&smem_ptr[i], &dmem_ptr[dmem_index]);
 				}
-			} else if (ldd & 0x1 == 0) {
+			} else if ((ldd & 0x1) == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
 					const auto i = i_offset + threadIdx.x * 2;
 					const auto m = (i % SMEM_M) + dmem_start_m;
