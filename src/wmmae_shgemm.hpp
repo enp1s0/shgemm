@@ -1,26 +1,27 @@
 #ifndef __SHGEMM_WMMAE_SHGEMM_HPP__
 #define __SHGEMM_WMMAE_SHGEMM_HPP__
 #include <wmma_extension/tcec/tcec.hpp>
+#include "utils.hpp"
 
 namespace mtk {
 namespace shgemm {
-template <int m, int n, int k, class A_Layout, class B_Layout, class T, class Op, int fm, int fn, int fk>
+namespace device {
+template <int m, int n, int k, class A_Layout, class B_Layout, class T>
 __device__ void mma_sync(
-		mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, m, n, k, T, void, mtk::wmma::tcec::Policy<Op, mtk::wmma::tcec::with_ec, fm, fn, fk>>& frag_d,
-		const mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_a, m, n, k, T, A_Layout, mtk::wmma::tcec::Policy<Op, mtk::wmma::tcec::with_ec, fm, fn, fk>>& frag_a,
-		const mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_b, m, n, k, T, B_Layout, mtk::wmma::tcec::Policy<Op, mtk::wmma::tcec::without_ec, fm, fn, fk>>& frag_b,
-		const mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, m, n, k, T, void, mtk::wmma::tcec::Policy<Op, mtk::wmma::tcec::with_ec, fm, fn, fk>>& frag_c) {
-	using Policy = mtk::wmma::tcec::Policy<Op, mtk::wmma::tcec::with_ec, fm, fn, fk>;
+		mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator      , m, n, k, T, void    , mtk::shgemm::device::A_Policy<T>>& frag_d,
+		const mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_a   , m, n, k, T, A_Layout, mtk::shgemm::device::A_Policy<T>>& frag_a,
+		const mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_b   , m, n, k, T, B_Layout, mtk::shgemm::device::B_Policy<T>>& frag_b,
+		const mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, m, n, k, T, void    , mtk::shgemm::device::A_Policy<T>>& frag_c) {
 	constexpr unsigned num_m_block = frag_d.num_sub_frag_m;
 	constexpr unsigned num_n_block = frag_d.num_sub_frag_n;
 	constexpr unsigned num_k_block = frag_a.num_sub_frag_n;
 
-	mtk::wmma::tcec::detail::mma_sync_wrapper<T, A_Layout, B_Layout, float, Policy> mma_op;
-	mtk::wmma::tcec::detail::fill_zero_wrapper<nvcuda::wmma::accumulator, float, void, Policy> zero_op;
+	mtk::wmma::tcec::detail::mma_sync_wrapper<T, A_Layout, B_Layout, float, mtk::shgemm::device::A_Policy<T>> mma_op;
+	mtk::wmma::tcec::detail::fill_zero_wrapper<nvcuda::wmma::accumulator, float, void, mtk::shgemm::device::A_Policy<T>> zero_op;
 
 	for (unsigned bm = 0; bm < num_m_block; bm++) {
 		for (unsigned bn = 0; bn < num_n_block; bn++) {
-			typename mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, m, n, k, T, void, mtk::wmma::tcec::Policy<Op, mtk::wmma::tcec::with_ec, fm, fn, fk>>::sub_frag_t tmp;
+			typename mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, m, n, k, T, void, mtk::shgemm::device::A_Policy<T>>::sub_frag_t tmp;
 			zero_op(tmp);
 			mma_op(
 					tmp,
@@ -58,6 +59,7 @@ __device__ void mma_sync(
 		}
 	}
 }
+} // namespace device
 } // namespace shgemm
 } // namespace mtk
 #endif
