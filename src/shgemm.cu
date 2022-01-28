@@ -53,8 +53,8 @@ __global__ void shgemm_kernel(
 
 	std::size_t block_k = 0;
 	a_dram_loader(a_smem_ptr,
-			block_k, blockIdx.y * SMEM_M,
-			k, m,
+			blockIdx.y * SMEM_M, block_k,
+			m, k,
 			a_ptr, lda
 			);
 	b_dram_loader(b_smem_ptr,
@@ -76,8 +76,8 @@ __global__ void shgemm_kernel(
 	__syncthreads();
 	for (; block_k < k; block_k += SMEM_K) {
 		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_M,
-				block_k, blockIdx.y * SMEM_M,
-				k, m,
+				blockIdx.y * SMEM_M, block_k,
+				m, k,
 				a_ptr, lda
 				);
 		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_N,
@@ -156,8 +156,8 @@ void shgemm_tn(
 	constexpr unsigned BLOCK_SIZE = 128;
 	using TC_T = half;
 
-	using A_DMEM_LOADER = mtk::shgemm::device::dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>;
-	using B_DMEM_LOADER = mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>;
+	using A_DMEM_LOADER = mtk::shgemm::device::dmem_loader_A_row_major<float, SMEM_M, SMEM_K, BLOCK_SIZE>;
+	using B_DMEM_LOADER = mtk::shgemm::device::dmem_loader_B_col_major<half , SMEM_K, SMEM_N, BLOCK_SIZE>;
 	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
 	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>;
 
