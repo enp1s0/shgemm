@@ -44,8 +44,8 @@ __global__ void shgemm_kernel(
 
 	extern __shared__ float smem[];
 	float* const a_smem_ptr = smem;
+	half * const b_smem_ptr = reinterpret_cast<half*>(a_smem_ptr + SMEM_K * SMEM_M * NUM_STAGES);
 	float* const c_smem_ptr = smem;
-	half * const b_smem_ptr = reinterpret_cast<half*>(c_smem_ptr + SMEM_M * SMEM_N);
 
 	A_DMEM_LOADER a_dram_loader;
 	B_DMEM_LOADER b_dram_loader;
