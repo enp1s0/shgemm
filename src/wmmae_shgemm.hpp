@@ -1,11 +1,37 @@
 #ifndef __SHGEMM_WMMAE_SHGEMM_HPP__
 #define __SHGEMM_WMMAE_SHGEMM_HPP__
+#include <type_traits>
 #include <wmma_extension/tcec/tcec.hpp>
 #include "utils.hpp"
 
 namespace mtk {
 namespace shgemm {
 namespace device {
+
+template <class MEM_Layout, unsigned SMEM_M, unsigned SMEM_N, int m, int n, int k, class T, class MEM_T>
+__device__ void load_matrix(
+		mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_a   , m, n, k, T, nvcuda::wmma::row_major, mtk::shgemm::device::A_Policy<T>>& frag,
+		const MEM_T* const ptr
+		) {
+	if constexpr (std::is_same<MEM_Layout, mtk::shgemm::utils::row_major>::value) {
+		mtk::wmma::tcec::load_matrix_sync(frag, ptr, SMEM_N, false);
+	} else {
+
+	}
+}
+
+template <class MEM_Layout, unsigned SMEM_M, unsigned SMEM_N, int m, int n, int k, class T, class MEM_T>
+__device__ void load_matrix(
+		mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_b   , m, n, k, T, nvcuda::wmma::col_major, mtk::shgemm::device::B_Policy<T>>& frag,
+		const MEM_T* const ptr
+		) {
+	if constexpr (std::is_same<MEM_Layout, mtk::shgemm::utils::col_major>::value) {
+		mtk::wmma::tcec::load_matrix_sync(frag, ptr, SMEM_M, false);
+	} else {
+
+	}
+}
+
 template <int m, int n, int k, class A_Layout, class B_Layout, class T>
 __device__ void mma_sync(
 		mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator      , m, n, k, T, void    , mtk::shgemm::device::A_Policy<T>>& frag_d,

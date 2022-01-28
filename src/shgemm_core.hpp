@@ -15,7 +15,9 @@ template<
 	unsigned FRAG_N,
 	unsigned FRAG_K,
 	unsigned BLOCK_SIZE,
-	class TC_T
+	class TC_T,
+	class A_LAYOUT,
+	class B_LAYOUT
 	>
 struct shgemm_core {
 	__device__ void operator()(
@@ -33,9 +35,9 @@ struct shgemm_core {
 
 			for (unsigned k = 0; k < SMEM_K; k += FRAG_K) {
 				mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_a, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::row_major, A_Policy<TC_T>> frag_a;
-				mtk::wmma::tcec::load_matrix_sync(frag_a, a_ptr + matrix_id_m * FRAG_M * SMEM_K + k, SMEM_K, false);
+				mtk::shgemm::device::load_matrix<A_LAYOUT, SMEM_M, SMEM_K>(frag_a, a_ptr + matrix_id_m * FRAG_M * SMEM_K + k);
 				mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_b, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::col_major, B_Policy<TC_T>> frag_b;
-				mtk::wmma::tcec::load_matrix_sync(frag_b, b_ptr + matrix_id_n * FRAG_N * SMEM_K + k, SMEM_K, false);
+				mtk::shgemm::device::load_matrix<B_LAYOUT, SMEM_K, SMEM_N>(frag_b, b_ptr + matrix_id_n * FRAG_N * SMEM_K + k);
 
 				mtk::shgemm::device::mma_sync(frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
 						frag_a,

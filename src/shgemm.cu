@@ -159,7 +159,7 @@ void shgemm_tn(
 	using A_DMEM_LOADER = mtk::shgemm::device::dmem_loader_row_major<float, SMEM_M, SMEM_K, BLOCK_SIZE>;
 	using B_DMEM_LOADER = mtk::shgemm::device::dmem_loader_col_major<half , SMEM_K, SMEM_N, BLOCK_SIZE>;
 	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
-	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>;
+	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
 
 	constexpr auto smem_size = get_shared_memory_size_in_byte(NUM_STAGES, SMEM_M, SMEM_N, SMEM_K);
 	const dim3 grid_size((n + SMEM_N - 1) / SMEM_N, (m + SMEM_M - 1) / SMEM_M);
