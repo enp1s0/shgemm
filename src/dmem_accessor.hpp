@@ -137,7 +137,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 };
 
 template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
-struct dmem_loader_A_row_major {
+struct dmem_loader_row_major {
 	__device__ void operator()(
 			T* const smem_ptr,
 			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
@@ -154,7 +154,7 @@ struct dmem_loader_A_row_major {
 };
 
 template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
-struct dmem_loader_B_col_major {
+struct dmem_loader_col_major {
 	__device__ void operator()(
 			T* const smem_ptr,
 			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
