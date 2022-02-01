@@ -8,11 +8,31 @@
 
 constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 5;
-constexpr std::size_t max_log_DIM = 14;
+constexpr std::size_t max_log_DIM = 13;
 constexpr std::size_t log_DIM_interval = 3;
+
+mtk::mateval::major_t convert_op_shgemm2mateval(
+		const mtk::shgemm::operation_t op
+		) {
+	if (op == mtk::shgemm::op_n) {
+		return mtk::mateval::col_major;
+	}
+	return mtk::mateval::row_major;
+}
+
+std::string op_name_str(
+		const mtk::shgemm::operation_t op
+		) {
+	if (op == mtk::shgemm::op_n) {
+		return "N";
+	}
+	return "T";
+}
 
 void test_shgemm_core(
 		mtk::shgemm::shgemmHandle_t shgemm_handle,
+		mtk::shgemm::operation_t op_a,
+		mtk::shgemm::operation_t op_b,
 		const float* const a_fp32_ptr,
 		const float* const b_fp32_ptr,
 		const half * const b_fp16_ptr,
@@ -24,7 +44,7 @@ void test_shgemm_core(
 	const float alpha = 1.0f, beta = 0.0f;
 	mtk::shgemm::shgemm(
 			shgemm_handle,
-			mtk::shgemm::op_t, mtk::shgemm::op_n,
+			op_a, op_b,
 			m, n, k,
 			&alpha,
 			a_fp32_ptr, k,
@@ -36,7 +56,9 @@ void test_shgemm_core(
 
 	const auto [relative_max_error, residual] = mtk::mateval::cuda::max_relative_error_and_residual_AxB(
 			m, n, k,
-			mtk::mateval::row_major, mtk::mateval::col_major, mtk::mateval::col_major,
+			convert_op_shgemm2mateval(op_a),
+			convert_op_shgemm2mateval(op_b),
+			mtk::mateval::col_major,
 			a_fp32_ptr, k,
 			b_fp32_ptr, k,
 			c_fp32_ptr, m
@@ -47,7 +69,7 @@ void test_shgemm_core(
 	for (std::size_t test_c = 0; test_c < test_count; test_c++) {
 	mtk::shgemm::shgemm(
 			shgemm_handle,
-			mtk::shgemm::op_t, mtk::shgemm::op_n,
+			op_a, op_b,
 			m, n, k,
 			&alpha,
 			a_fp32_ptr, k,
@@ -62,8 +84,10 @@ void test_shgemm_core(
 
 	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
 
-	std::printf("%lu,%lu,%lu,%e,%e,%e\n",
+	std::printf("%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
 			m, n, k,
+			op_name_str(op_a).c_str(),
+			op_name_str(op_b).c_str(),
 			residual,
 			relative_max_error,
 			throughput
@@ -115,7 +139,7 @@ int main() {
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
 
-	std::printf("m,n,k,residual,relative_max_error,throughput_in_tflops\n");
+	std::printf("m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
 	std::fflush(stdout);
 	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
 		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
@@ -125,6 +149,8 @@ int main() {
 				const auto k = 1lu << log_K;
 				test_shgemm_core(
 						shgemm_handle,
+						mtk::shgemm::op_t,
+						mtk::shgemm::op_n,
 						a_fp32_uptr.get(),
 						b_fp32_uptr.get(),
 						b_fp16_uptr.get(),

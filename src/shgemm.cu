@@ -53,8 +53,8 @@ __global__ void shgemm_kernel(
 
 	std::size_t block_k = 0;
 	a_dram_loader(a_smem_ptr,
-			block_k, blockIdx.y * SMEM_M,
-			k, m,
+			blockIdx.y * SMEM_M, block_k,
+			m, k,
 			a_ptr, lda
 			);
 	b_dram_loader(b_smem_ptr,
@@ -76,8 +76,8 @@ __global__ void shgemm_kernel(
 	__syncthreads();
 	for (; block_k < k; block_k += SMEM_K) {
 		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_M,
-				block_k, blockIdx.y * SMEM_M,
-				k, m,
+				blockIdx.y * SMEM_M, block_k,
+				m, k,
 				a_ptr, lda
 				);
 		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_N,
@@ -135,7 +135,22 @@ constexpr unsigned get_shared_memory_size_in_byte(
 		SMEM_M * SMEM_N * size_of<float>);
 }
 
-void shgemm_tn(
+template <mtk::shgemm::operation_t op, class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct loader_selector {};
+
+template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct loader_selector<mtk::shgemm::op_n, T, SMEM_M, SMEM_N, BLOCK_SIZE> {
+	using type = mtk::shgemm::device::dmem_loader_col_major<T, SMEM_M, SMEM_N, BLOCK_SIZE>;
+};
+
+template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct loader_selector<mtk::shgemm::op_t, T, SMEM_M, SMEM_N, BLOCK_SIZE> {
+	using type = mtk::shgemm::device::dmem_loader_row_major<T, SMEM_M, SMEM_N, BLOCK_SIZE>;
+};
+
+
+template <mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b>
+void shgemm_kernel_launcher(
 		const mtk::shgemm::shgemmHandle_t handle,
 		const std::size_t m,
 		const std::size_t n,
@@ -156,10 +171,10 @@ void shgemm_tn(
 	constexpr unsigned BLOCK_SIZE = 128;
 	using TC_T = half;
 
-	using A_DMEM_LOADER = mtk::shgemm::device::dmem_loader_n<float, SMEM_K, SMEM_M, BLOCK_SIZE>;
-	using B_DMEM_LOADER = mtk::shgemm::device::dmem_loader_n<half , SMEM_K, SMEM_N, BLOCK_SIZE>;
+	using A_DMEM_LOADER = typename loader_selector<op_a, float, SMEM_M, SMEM_K, BLOCK_SIZE>::type;
+	using B_DMEM_LOADER = typename loader_selector<op_b, half , SMEM_K, SMEM_N, BLOCK_SIZE>::type;
 	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
-	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T>;
+	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
 
 	constexpr auto smem_size = get_shared_memory_size_in_byte(NUM_STAGES, SMEM_M, SMEM_N, SMEM_K);
 	const dim3 grid_size((n + SMEM_N - 1) / SMEM_N, (m + SMEM_M - 1) / SMEM_M);
@@ -234,7 +249,37 @@ void mtk::shgemm::shgemm(
 		float* const c_ptr, const std::size_t ldc
 		) {
 	if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
-		shgemm_tn(
+		shgemm_kernel_launcher<mtk::shgemm::op_t, mtk::shgemm::op_n>(
+				handle,
+				m, n, k,
+				alpha_ptr,
+				a_ptr, lda,
+				b_ptr, ldb,
+				beta_ptr,
+				c_ptr, ldc
+				);
+	} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
+		shgemm_kernel_launcher<mtk::shgemm::op_n, mtk::shgemm::op_n>(
+				handle,
+				m, n, k,
+				alpha_ptr,
+				a_ptr, lda,
+				b_ptr, ldb,
+				beta_ptr,
+				c_ptr, ldc
+				);
+	} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
+		shgemm_kernel_launcher<mtk::shgemm::op_n, mtk::shgemm::op_t>(
+				handle,
+				m, n, k,
+				alpha_ptr,
+				a_ptr, lda,
+				b_ptr, ldb,
+				beta_ptr,
+				c_ptr, ldc
+				);
+	} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
+		shgemm_kernel_launcher<mtk::shgemm::op_t, mtk::shgemm::op_t>(
 				handle,
 				m, n, k,
 				alpha_ptr,

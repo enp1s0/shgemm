@@ -137,6 +137,45 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 };
 
 template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct dmem_loader_row_major {
+	using layout = mtk::shgemm::utils::row_major;
+	__device__ void operator()(
+			T* const smem_ptr,
+			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
+			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const T* const dmem_ptr, const std::size_t ldd
+			) {
+		dmem_loader_n<T, SMEM_N, SMEM_M, BLOCK_SIZE>{}(
+				smem_ptr,
+				dmem_start_n, dmem_start_m,
+				dmem_size_n, dmem_size_m,
+				dmem_ptr, ldd
+				);
+	}
+};
+
+template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct dmem_loader_col_major {
+	using layout = mtk::shgemm::utils::col_major;
+	__device__ void operator()(
+			T* const smem_ptr,
+			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
+			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const T* const dmem_ptr, const std::size_t ldd
+			) {
+		dmem_loader_n<T, SMEM_M, SMEM_N, BLOCK_SIZE>{}(
+				smem_ptr,
+				dmem_start_m, dmem_start_n,
+				dmem_size_m, dmem_size_n,
+				dmem_ptr, ldd
+				);
+	}
+};
+
+// -----------------------------------------
+// N - storer
+// -----------------------------------------
+template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_storer_n {
 	__device__ void operator()(
 			T* const dmem_ptr, const std::size_t ldd,
