@@ -95,13 +95,13 @@ struct shgemm_core_pipeline {
 			mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_a, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::row_major, A_Policy<TC_T>> frag_a[2];
 			mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_b, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::col_major, B_Policy<TC_T>> frag_b[2];
 
-			mtk::shgemm::device::load_matrix<A_LAYOUT, SMEM_M, SMEM_K>(frag_a[0], a_ptr + matrix_id_m * FRAG_M * SMEM_K);
-			mtk::shgemm::device::load_matrix<B_LAYOUT, SMEM_K, SMEM_N>(frag_b[0], b_ptr + matrix_id_n * FRAG_N * SMEM_K);
+			mtk::shgemm::device::load_matrix<A_LAYOUT, SMEM_M, SMEM_K>(frag_a[0], a_ptr + calculate_mem_A_offset<A_LAYOUT, SMEM_M, SMEM_K, FRAG_M>(matrix_id_m, 0));
+			mtk::shgemm::device::load_matrix<B_LAYOUT, SMEM_K, SMEM_N>(frag_b[0], b_ptr + calculate_mem_B_offset<B_LAYOUT, SMEM_K, SMEM_N, FRAG_N>(matrix_id_n, 0));
 
 			unsigned k = FRAG_K;
 			for (; k < SMEM_K; k += FRAG_K) {
-				mtk::shgemm::device::load_matrix<A_LAYOUT, SMEM_M, SMEM_K>(frag_a[(k / FRAG_K) & 0x1], a_ptr + matrix_id_m * FRAG_M * SMEM_K + k);
-				mtk::shgemm::device::load_matrix<B_LAYOUT, SMEM_K, SMEM_N>(frag_b[(k / FRAG_K) & 0x1], b_ptr + matrix_id_n * FRAG_N * SMEM_K + k);
+				mtk::shgemm::device::load_matrix<A_LAYOUT, SMEM_M, SMEM_K>(frag_a[(k / FRAG_K) & 0x1], a_ptr + calculate_mem_A_offset<A_LAYOUT, SMEM_M, SMEM_K, FRAG_M>(matrix_id_m, k));
+				mtk::shgemm::device::load_matrix<B_LAYOUT, SMEM_K, SMEM_N>(frag_b[(k / FRAG_K) & 0x1], b_ptr + calculate_mem_B_offset<B_LAYOUT, SMEM_K, SMEM_N, FRAG_N>(matrix_id_n, k));
 
 				mtk::shgemm::device::mma_sync(frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
 						frag_a[1 - ((k / FRAG_K) & 0x1)],
