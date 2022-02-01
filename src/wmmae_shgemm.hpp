@@ -60,11 +60,9 @@ __device__ void load_matrix(
 							const auto mem_offset = mtk::wmma::tcec::detail::compute_mem_offset<frag_m, frag_n, nvcuda::wmma::row_major>{}(i, j, SMEM_N, bm * frag_m, bn * frag_n);
 							const auto v = ptr[mem_offset];
 							const auto hv = mtk::wmma::detail::common::cast<T>(v);
-							const auto dhv = mtk::wmma::detail::common::cast<T>(mtk::wmma::tcec::detail::correction_scale_0<T>(v - mtk::wmma::detail::common::cast<float>(hv)));
 							for (unsigned f = 0; f < frag_index_count; f++) {
 								const auto frag_index = frag_index_list[f];
 								frag.sub_frag  [bm + frag.num_sub_frag_m * bn].x[frag_index] = hv ;
-								frag.sub_d_frag[bm + frag.num_sub_frag_m * bn].x[frag_index] = dhv;
 							}
 						}
 					}
