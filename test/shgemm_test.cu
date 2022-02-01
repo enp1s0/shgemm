@@ -20,6 +20,15 @@ mtk::mateval::major_t convert_op_shgemm2mateval(
 	return mtk::mateval::row_major;
 }
 
+std::string op_name_str(
+		const mtk::shgemm::operation_t op
+		) {
+	if (op == mtk::shgemm::op_n) {
+		return "N";
+	}
+	return "T";
+}
+
 void test_shgemm_core(
 		mtk::shgemm::shgemmHandle_t shgemm_handle,
 		mtk::shgemm::operation_t op_a,
@@ -75,8 +84,10 @@ void test_shgemm_core(
 
 	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
 
-	std::printf("%lu,%lu,%lu,%e,%e,%e\n",
+	std::printf("%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
 			m, n, k,
+			op_name_str(op_a).c_str(),
+			op_name_str(op_b).c_str(),
 			residual,
 			relative_max_error,
 			throughput
@@ -128,7 +139,7 @@ int main() {
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
 
-	std::printf("m,n,k,residual,relative_max_error,throughput_in_tflops\n");
+	std::printf("m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
 	std::fflush(stdout);
 	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
 		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
