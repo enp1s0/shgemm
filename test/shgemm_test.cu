@@ -8,11 +8,22 @@
 
 constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 5;
-constexpr std::size_t max_log_DIM = 14;
+constexpr std::size_t max_log_DIM = 13;
 constexpr std::size_t log_DIM_interval = 3;
+
+mtk::mateval::major_t convert_op_shgemm2mateval(
+		const mtk::shgemm::operation_t op
+		) {
+	if (op == mtk::shgemm::op_n) {
+		return mtk::mateval::col_major;
+	}
+	return mtk::mateval::row_major;
+}
 
 void test_shgemm_core(
 		mtk::shgemm::shgemmHandle_t shgemm_handle,
+		mtk::shgemm::operation_t op_a,
+		mtk::shgemm::operation_t op_b,
 		const float* const a_fp32_ptr,
 		const float* const b_fp32_ptr,
 		const half * const b_fp16_ptr,
@@ -24,7 +35,7 @@ void test_shgemm_core(
 	const float alpha = 1.0f, beta = 0.0f;
 	mtk::shgemm::shgemm(
 			shgemm_handle,
-			mtk::shgemm::op_t, mtk::shgemm::op_n,
+			op_a, op_b,
 			m, n, k,
 			&alpha,
 			a_fp32_ptr, k,
@@ -36,7 +47,9 @@ void test_shgemm_core(
 
 	const auto [relative_max_error, residual] = mtk::mateval::cuda::max_relative_error_and_residual_AxB(
 			m, n, k,
-			mtk::mateval::row_major, mtk::mateval::col_major, mtk::mateval::col_major,
+			convert_op_shgemm2mateval(op_a),
+			convert_op_shgemm2mateval(op_b),
+			mtk::mateval::col_major,
 			a_fp32_ptr, k,
 			b_fp32_ptr, k,
 			c_fp32_ptr, m
@@ -47,7 +60,7 @@ void test_shgemm_core(
 	for (std::size_t test_c = 0; test_c < test_count; test_c++) {
 	mtk::shgemm::shgemm(
 			shgemm_handle,
-			mtk::shgemm::op_t, mtk::shgemm::op_n,
+			op_a, op_b,
 			m, n, k,
 			&alpha,
 			a_fp32_ptr, k,
@@ -125,6 +138,8 @@ int main() {
 				const auto k = 1lu << log_K;
 				test_shgemm_core(
 						shgemm_handle,
+						mtk::shgemm::op_t,
+						mtk::shgemm::op_n,
 						a_fp32_uptr.get(),
 						b_fp32_uptr.get(),
 						b_fp16_uptr.get(),
