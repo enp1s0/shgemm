@@ -258,5 +258,15 @@ void mtk::shgemm::shgemm(
 				beta_ptr,
 				c_ptr, ldc
 				);
+	} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
+		shgemm_kernel_launcher<mtk::shgemm::op_n, mtk::shgemm::op_n>(
+				handle,
+				m, n, k,
+				alpha_ptr,
+				a_ptr, lda,
+				b_ptr, ldb,
+				beta_ptr,
+				c_ptr, ldc
+				);
 	}
 }
