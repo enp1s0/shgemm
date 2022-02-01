@@ -7,6 +7,24 @@ namespace mtk {
 namespace shgemm {
 namespace device {
 
+template <class LAYOUT, unsigned SMEM_K, unsigned FRAG_M>
+__device__ unsigned calculate_mem_A_offset(const unsigned matrix_id_m, const unsigned k) {
+	if constexpr (std::is_same<LAYOUT, mtk::shgemm::utils::row_major>::value) {
+		return matrix_id_m * FRAG_M * SMEM_K + k;
+	} else {
+		return matrix_id_m * FRAG_M + k * SMEM_K;
+	}
+}
+
+template <class LAYOUT, unsigned SMEM_K, unsigned FRAG_N>
+__device__ unsigned calculate_mem_B_offset(const unsigned matrix_id_n, const unsigned k) {
+	if constexpr (std::is_same<LAYOUT, mtk::shgemm::utils::col_major>::value) {
+		return matrix_id_n * FRAG_N * SMEM_K + k;
+	} else {
+		return matrix_id_n * FRAG_N + k * SMEM_K;
+	}
+}
+
 template<
 	unsigned SMEM_M,
 	unsigned SMEM_N,
@@ -35,9 +53,9 @@ struct shgemm_core {
 
 			for (unsigned k = 0; k < SMEM_K; k += FRAG_K) {
 				mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_a, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::row_major, A_Policy<TC_T>> frag_a;
-				mtk::shgemm::device::load_matrix<A_LAYOUT, SMEM_M, SMEM_K>(frag_a, a_ptr + matrix_id_m * FRAG_M * SMEM_K + k);
+				mtk::shgemm::device::load_matrix<A_LAYOUT, SMEM_M, SMEM_K>(frag_a, a_ptr + calculate_mem_A_offset<A_LAYOUT, SMEM_K, FRAG_M>(matrix_id_m, k));
 				mtk::wmma::tcec::fragment<nvcuda::wmma::matrix_b, FRAG_M, FRAG_N, FRAG_K, TC_T, nvcuda::wmma::col_major, B_Policy<TC_T>> frag_b;
-				mtk::shgemm::device::load_matrix<B_LAYOUT, SMEM_K, SMEM_N>(frag_b, b_ptr + matrix_id_n * FRAG_N * SMEM_K + k);
+				mtk::shgemm::device::load_matrix<B_LAYOUT, SMEM_K, SMEM_N>(frag_b, b_ptr + calculate_mem_B_offset<B_LAYOUT, SMEM_K, FRAG_N>(matrix_id_n, k));
 
 				mtk::shgemm::device::mma_sync(frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
 						frag_a,
