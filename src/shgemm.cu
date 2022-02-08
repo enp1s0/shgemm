@@ -5,6 +5,7 @@
 #include <cassert>
 #include "shgemm_core.hpp"
 #include "dmem_accessor.hpp"
+#include "shgemm_pipeline_core.hpp"
 
 namespace {
 template <unsigned SIZE, unsigned BLOCK_SIZE>
@@ -45,63 +46,32 @@ __global__ void shgemm_kernel(
 	extern __shared__ float smem[];
 	float* const a_smem_ptr = smem;
 	half * const b_smem_ptr = reinterpret_cast<half*>(a_smem_ptr + SMEM_K * SMEM_M * NUM_STAGES);
-	float* const c_smem_ptr = smem;
 
-	A_DMEM_LOADER a_dram_loader;
-	B_DMEM_LOADER b_dram_loader;
-	SHGEMM_CORE shgemm_core;
+	mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[(SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)];
 
-	std::size_t block_k = 0;
-	a_dram_loader(a_smem_ptr,
-			blockIdx.y * SMEM_M, block_k,
-			m, k,
-			a_ptr, lda
-			);
-	b_dram_loader(b_smem_ptr,
-			block_k, blockIdx.x * SMEM_N,
-			k, n,
-			b_ptr, ldb
-			);
-	block_k += SMEM_K;
-
-	// Initialize frag C
-	constexpr unsigned frag_c_length = (SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size);
-	mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[frag_c_length];
-	for (unsigned i = 0; i < frag_c_length; i++) {
-		mtk::wmma::tcec::fill_zero(frag_c[i]);
-	}
-
-	// MMA
-	cutf::cp_async::wait_all();
-	__syncthreads();
-	for (; block_k < k; block_k += SMEM_K) {
-		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_M,
-				blockIdx.y * SMEM_M, block_k,
-				m, k,
-				a_ptr, lda
-				);
-		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_N,
-				block_k, blockIdx.x * SMEM_N,
-				k, n,
-				b_ptr, ldb
-				);
-
-		shgemm_core(frag_c,
-				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
-				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
-				);
-		cutf::cp_async::wait_all();
-		__syncthreads();
-	}
-
-	shgemm_core(frag_c,
-			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
-			b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
+	mtk::shgemm::device::shgemm_pipeline_core<
+		SMEM_M, SMEM_N, SMEM_K,
+		FRAG_M, FRAG_N, FRAG_K,
+		A_DMEM_LOADER,
+		B_DMEM_LOADER,
+		SHGEMM_CORE,
+		NUM_STAGES,
+		BLOCK_SIZE,
+		TC_T
+		> pipeline_core;
+	pipeline_core(
+			m, n, k,
+			a_ptr, lda,
+			b_ptr, ldb,
+			a_smem_ptr,
+			b_smem_ptr,
+			frag_c
 			);
 
 	// Store frag C to smem
 	__syncthreads();
 	constexpr unsigned num_submatrices = (SMEM_M / FRAG_M) * (SMEM_N / FRAG_N);
+	float* const c_smem_ptr = smem;
 	for (unsigned matrix_id_offset = 0; matrix_id_offset < num_submatrices; matrix_id_offset += BLOCK_SIZE / mtk::shgemm::utils::warp_size) {
 		const unsigned matrix_id = matrix_id_offset + (threadIdx.x / mtk::shgemm::utils::warp_size);
 		const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
