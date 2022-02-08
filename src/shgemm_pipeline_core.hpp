@@ -91,6 +91,8 @@ struct shgemm_pipeline_core<
 		mtk::wmma::tcec::fill_zero(frag_c[i]);
 	}
 
+	cutf::cp_async::wait_all();
+	__syncthreads();
 	// MMA
 #pragma unroll
 	for (; block_k < k; block_k += SMEM_K) {
@@ -105,15 +107,15 @@ struct shgemm_pipeline_core<
 				b_dmem_ptr, ldb
 				);
 
-		cutf::cp_async::wait_group<1>();
-		__syncthreads();
 		shgemm_core(frag_c,
 				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 				);
+		cutf::cp_async::wait_group<2>();
+		__syncthreads();
 	}
 
-	cutf::cp_async::wait_group<1>();
+	cutf::cp_async::wait_all();
 	__syncthreads();
 	shgemm_core(frag_c,
 			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
