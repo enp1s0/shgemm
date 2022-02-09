@@ -17,20 +17,6 @@ __device__ void mem_fill_zero(
 	}
 }
 
-template <unsigned SMEM_M, unsigned SMEM_K, class Layout>
-struct get_A_smem_size{const static unsigned value = 0;};
-template <unsigned SMEM_M, unsigned SMEM_K>
-struct get_A_smem_size<SMEM_M, SMEM_K, mtk::shgemm::utils::row_major> {const static unsigned value = (SMEM_K + mtk::shgemm::device::A_smem_skew) * SMEM_M;};
-template <unsigned SMEM_M, unsigned SMEM_K>
-struct get_A_smem_size<SMEM_M, SMEM_K, mtk::shgemm::utils::col_major> {const static unsigned value = (SMEM_M + mtk::shgemm::device::A_smem_skew) * SMEM_K;};
-
-template <unsigned SMEM_K, unsigned SMEM_N, class Layout>
-struct get_B_smem_size{const static unsigned value = 0;};
-template <unsigned SMEM_K, unsigned SMEM_N>
-struct get_B_smem_size<SMEM_K, SMEM_N, mtk::shgemm::utils::row_major> {const static unsigned value = (SMEM_N + mtk::shgemm::device::A_smem_skew) * SMEM_K;};
-template <unsigned SMEM_K, unsigned SMEM_N>
-struct get_B_smem_size<SMEM_K, SMEM_N, mtk::shgemm::utils::col_major> {const static unsigned value = (SMEM_K + mtk::shgemm::device::A_smem_skew) * SMEM_N;};
-
 template<
 	unsigned SMEM_M,
 	unsigned SMEM_N,
@@ -59,7 +45,7 @@ __global__ void shgemm_kernel(
 
 	extern __shared__ float smem[];
 	float* const a_smem_ptr = smem;
-	half * const b_smem_ptr = reinterpret_cast<half*>(a_smem_ptr + get_A_smem_size<SMEM_M, SMEM_K, typename A_DMEM_LOADER::layout>::value * NUM_STAGES);
+	half * const b_smem_ptr = reinterpret_cast<half*>(a_smem_ptr + mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, typename A_DMEM_LOADER::layout>::value * NUM_STAGES);
 
 	mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[(SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)];
 
@@ -111,8 +97,8 @@ template <> constexpr unsigned size_of<half > = 2;
 template <unsigned SMEM_M, unsigned SMEM_N, unsigned SMEM_K, unsigned NUM_STAGES, class A_layout, class B_layout>
 unsigned get_shared_memory_size_in_byte(
 		) {
-	return std::max(NUM_STAGES * (get_A_smem_size<SMEM_M, SMEM_K, A_layout>::value) * size_of<float> +
-		NUM_STAGES * (get_B_smem_size<SMEM_K, SMEM_N, B_layout>::value) * size_of<half>,
+	return std::max(NUM_STAGES * (mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, A_layout>::value) * size_of<float> +
+		NUM_STAGES * (mtk::shgemm::device::get_B_smem_size<SMEM_K, SMEM_N, B_layout>::value) * size_of<half>,
 		SMEM_M * SMEM_N * size_of<float>);
 }
 
