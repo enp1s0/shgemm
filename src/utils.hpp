@@ -15,6 +15,9 @@ template <class TC_T>
 using A_Policy = typename mtk::wmma::tcec::detail::default_policy<TC_T, mtk::wmma::tcec::op_with_error_correction   , mtk::wmma::tcec::op_mma>::type;
 template <class TC_T>
 using B_Policy = typename mtk::wmma::tcec::detail::default_policy<TC_T, mtk::wmma::tcec::op_without_error_correction, mtk::wmma::tcec::op_mma>::type;
+
+constexpr unsigned A_smem_skew = 0;
+constexpr unsigned B_smem_skew = 0;
 } // namespace device
 } // namespace shgemm
 } // namespace mtk
