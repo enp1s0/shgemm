@@ -96,12 +96,12 @@ struct shgemm_pipeline_core<
 	// MMA
 #pragma unroll
 	for (; block_k < k; block_k += SMEM_K) {
-		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, typename A_DMEM_LOADER::layout>::value,
+		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_M,
 				blockIdx.y * SMEM_M, block_k,
 				m, k,
 				a_dmem_ptr, lda
 				);
-		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * mtk::shgemm::device::get_B_smem_size<SMEM_K, SMEM_N, typename B_DMEM_LOADER::layout>::value,
+		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * SMEM_K * SMEM_N,
 				block_k, blockIdx.x * SMEM_N,
 				k, n,
 				b_dmem_ptr, ldb

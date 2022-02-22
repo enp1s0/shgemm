@@ -14,7 +14,7 @@ __device__ void load_matrix(
 		const MEM_T* const ptr
 		) {
 	if constexpr (std::is_same<MEM_Layout, mtk::shgemm::utils::row_major>::value) {
-		mtk::wmma::tcec::load_matrix_sync(frag, ptr, SMEM_N + mtk::shgemm::device::A_smem_skew, false);
+		mtk::wmma::tcec::load_matrix_sync(frag, ptr, SMEM_N, false);
 	} else {
 		using Policy = mtk::shgemm::device::A_Policy<T>;
 		using Use = nvcuda::wmma::matrix_a;
@@ -25,7 +25,7 @@ __device__ void load_matrix(
 				[&](const unsigned frag_index_list[], const unsigned frag_index_count, const unsigned i, const unsigned j) {
 					for (unsigned bm = 0; bm < frag.num_sub_frag_m; bm++) {
 						for (unsigned bn = 0; bn < frag.num_sub_frag_n; bn++) {
-							const auto mem_offset = mtk::wmma::tcec::detail::compute_mem_offset<frag_m, frag_n, nvcuda::wmma::col_major>{}(i, j, SMEM_M + mtk::shgemm::device::A_smem_skew, bm * frag_m, bn * frag_n);
+							const auto mem_offset = mtk::wmma::tcec::detail::compute_mem_offset<frag_m, frag_n, nvcuda::wmma::col_major>{}(i, j, SMEM_M, bm * frag_m, bn * frag_n);
 							const auto v = ptr[mem_offset];
 							const auto hv = mtk::wmma::detail::common::cast<T>(v);
 							const auto dhv = mtk::wmma::detail::common::cast<T>(mtk::wmma::tcec::detail::correction_scale_0<T>(v - mtk::wmma::detail::common::cast<float>(hv)));
@@ -46,7 +46,7 @@ __device__ void load_matrix(
 		const MEM_T* const ptr
 		) {
 	if constexpr (std::is_same<MEM_Layout, mtk::shgemm::utils::col_major>::value) {
-		mtk::wmma::tcec::load_matrix_sync(frag, ptr, SMEM_M + mtk::shgemm::device::B_smem_skew, false);
+		mtk::wmma::tcec::load_matrix_sync(frag, ptr, SMEM_M, false);
 	} else {
 		using Policy = mtk::shgemm::device::B_Policy<T>;
 		using Use = nvcuda::wmma::matrix_b;
@@ -57,7 +57,7 @@ __device__ void load_matrix(
 				[&](const unsigned frag_index_list[], const unsigned frag_index_count, const unsigned i, const unsigned j) {
 					for (unsigned bm = 0; bm < frag.num_sub_frag_m; bm++) {
 						for (unsigned bn = 0; bn < frag.num_sub_frag_n; bn++) {
-							const auto mem_offset = mtk::wmma::tcec::detail::compute_mem_offset<frag_m, frag_n, nvcuda::wmma::row_major>{}(i, j, SMEM_N + mtk::shgemm::device::B_smem_skew, bm * frag_m, bn * frag_n);
+							const auto mem_offset = mtk::wmma::tcec::detail::compute_mem_offset<frag_m, frag_n, nvcuda::wmma::row_major>{}(i, j, SMEM_N, bm * frag_m, bn * frag_n);
 							const auto v = ptr[mem_offset];
 							const auto hv = mtk::wmma::detail::common::cast<T>(v);
 							for (unsigned f = 0; f < frag_index_count; f++) {
