@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 project(shgemm LANGUAGES CXX CUDA)
 
+set(BUILD_SHGEMM_TEST OFF)
+
 find_package(CUDA 11.0 REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 
@@ -50,20 +52,21 @@ install(TARGETS shgemm
 ##########################################################################
 # Tests
 ##########################################################################
+if (${BUILD_SHGEMM_TEST})
+	# Directory
+	set(TESTSRCDIR test)
 
-# Directory
-set(TESTSRCDIR test)
-
-foreach(test shgemm)
-	set(test_out ${test}.test)
-	add_executable(${test_out} ${TESTSRCDIR}/${test}_test.cu ${HEADERS})
-	target_include_directories(${test_out} PRIVATE ${INCDIR})
-	target_include_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/include)
-	target_link_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/build)
-	target_link_libraries(${test_out} PRIVATE mateval_cuda)
-	target_link_libraries(${test_out} PRIVATE shgemm)
-	target_link_libraries(${test_out} PRIVATE
-		CUDA::cublas
-		CUDA::curand
-		)
-endforeach()
+	foreach(test shgemm)
+		set(test_out ${test}.test)
+		add_executable(${test_out} ${TESTSRCDIR}/${test}_test.cu ${HEADERS})
+		target_include_directories(${test_out} PRIVATE ${INCDIR})
+		target_include_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/include)
+		target_link_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/build)
+		target_link_libraries(${test_out} PRIVATE mateval_cuda)
+		target_link_libraries(${test_out} PRIVATE shgemm)
+		target_link_libraries(${test_out} PRIVATE
+			CUDA::cublas
+			CUDA::curand
+			)
+	endforeach()
+endif()
