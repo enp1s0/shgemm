@@ -111,12 +111,10 @@ struct shgemm_pipeline_core<
 				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
 				);
-		cutf::cp_async::wait_group<2>();
+		cutf::cp_async::wait_all();
 		__syncthreads();
 	}
 
-	cutf::cp_async::wait_all();
-	__syncthreads();
 	shgemm_core(frag_c,
 			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
 			b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
