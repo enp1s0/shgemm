@@ -45,7 +45,7 @@ __global__ void shgemm_kernel(
 
 	extern __shared__ float smem[];
 	float* const a_smem_ptr = smem;
-	half * const b_smem_ptr = reinterpret_cast<half*>(a_smem_ptr + SMEM_K * SMEM_M * NUM_STAGES);
+	half * const b_smem_ptr = reinterpret_cast<half*>(a_smem_ptr + mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, typename A_DMEM_LOADER::layout>::value * NUM_STAGES);
 
 	mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[(SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)];
 
@@ -94,14 +94,11 @@ constexpr unsigned size_of = 0;
 template <> constexpr unsigned size_of<float> = 4;
 template <> constexpr unsigned size_of<half > = 2;
 
-constexpr unsigned get_shared_memory_size_in_byte(
-		const unsigned NUM_STAGES,
-		const unsigned SMEM_M,
-		const unsigned SMEM_N,
-		const unsigned SMEM_K
+template <unsigned SMEM_M, unsigned SMEM_N, unsigned SMEM_K, unsigned NUM_STAGES, class A_layout, class B_layout>
+unsigned get_shared_memory_size_in_byte(
 		) {
-	return std::max(NUM_STAGES * SMEM_M * SMEM_K * size_of<float> +
-		NUM_STAGES * SMEM_K * SMEM_N * size_of<half>,
+	return std::max(NUM_STAGES * (mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, A_layout>::value) * size_of<float> +
+		NUM_STAGES * (mtk::shgemm::device::get_B_smem_size<SMEM_K, SMEM_N, B_layout>::value) * size_of<half>,
 		SMEM_M * SMEM_N * size_of<float>);
 }
 
@@ -144,9 +141,9 @@ void shgemm_kernel_launcher(
 	using A_DMEM_LOADER = typename loader_selector<op_a, float, SMEM_M, SMEM_K, BLOCK_SIZE>::type;
 	using B_DMEM_LOADER = typename loader_selector<op_b, half , SMEM_K, SMEM_N, BLOCK_SIZE>::type;
 	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
-	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
+	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
 
-	constexpr auto smem_size = get_shared_memory_size_in_byte(NUM_STAGES, SMEM_M, SMEM_N, SMEM_K);
+	const auto smem_size = get_shared_memory_size_in_byte<SMEM_M, SMEM_N, SMEM_K, NUM_STAGES, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>();
 	const dim3 grid_size((n + SMEM_N - 1) / SMEM_N, (m + SMEM_M - 1) / SMEM_M);
 	const dim3 block_size(BLOCK_SIZE);
 
