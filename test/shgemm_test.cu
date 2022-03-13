@@ -39,7 +39,8 @@ void test_shgemm_core(
 		float* const c_fp32_ptr,
 		const std::size_t m,
 		const std::size_t n,
-		const std::size_t k
+		const std::size_t k,
+		const mtk::shgemm::tc_t compute_type
 		) {
 	const float alpha = 1.0f, beta = 0.0f;
 	mtk::shgemm::shgemm(
@@ -50,7 +51,8 @@ void test_shgemm_core(
 			a_fp32_ptr, k,
 			b_fp16_ptr, k,
 			&beta,
-			c_fp32_ptr, m
+			c_fp32_ptr, m,
+			compute_type
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
@@ -75,7 +77,8 @@ void test_shgemm_core(
 			a_fp32_ptr, k,
 			b_fp16_ptr, k,
 			&beta,
-			c_fp32_ptr, m
+			c_fp32_ptr, m,
+			compute_type
 			);
 	}
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
@@ -155,7 +158,8 @@ int main() {
 						b_fp32_uptr.get(),
 						b_fp16_uptr.get(),
 						c_fp32_uptr.get(),
-						m, n, k
+						m, n, k,
+						mtk::shgemm::tf32
 						);
 			}
 		}
