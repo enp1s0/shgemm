@@ -10,6 +10,9 @@ constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 5;
 constexpr std::size_t max_log_DIM = 13;
 constexpr std::size_t log_DIM_interval = 3;
+constexpr auto compute_type = mtk::shgemm::tf32;
+constexpr auto op_a = mtk::shgemm::op_n;
+constexpr auto op_b = mtk::shgemm::op_n;
 
 mtk::mateval::major_t convert_op_shgemm2mateval(
 		const mtk::shgemm::operation_t op
@@ -152,14 +155,14 @@ int main() {
 				const auto k = 1lu << log_K;
 				test_shgemm_core(
 						shgemm_handle,
-						mtk::shgemm::op_t,
-						mtk::shgemm::op_n,
+						op_a,
+						op_b,
 						a_fp32_uptr.get(),
 						b_fp32_uptr.get(),
 						b_fp16_uptr.get(),
 						c_fp32_uptr.get(),
 						m, n, k,
-						mtk::shgemm::tf32
+						compute_type
 						);
 			}
 		}
