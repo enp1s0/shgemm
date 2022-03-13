@@ -378,6 +378,139 @@ void mtk::shgemm::create(
 				kernel, num_sm
 				);
 	}
+
+	/*=======================================
+		FP16-NN
+		=====================================*/
+	{
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_n;
+		constexpr auto OP_B = mtk::shgemm::op_n;
+
+		auto& kernel = handle.fp16_nn_kernel[0];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	{
+		constexpr unsigned BLOCK_SIZE = 64;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_n;
+		constexpr auto OP_B = mtk::shgemm::op_n;
+
+		auto& kernel = handle.fp16_nn_kernel[1];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	/*=======================================
+		FP16-NT
+		=====================================*/
+	{
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_n;
+		constexpr auto OP_B = mtk::shgemm::op_t;
+
+		auto& kernel = handle.fp16_nt_kernel[0];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	{
+		constexpr unsigned BLOCK_SIZE = 64;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_n;
+		constexpr auto OP_B = mtk::shgemm::op_t;
+
+		auto& kernel = handle.fp16_nt_kernel[1];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	/*=======================================
+		FP16-TN
+		=====================================*/
+	{
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_t;
+		constexpr auto OP_B = mtk::shgemm::op_n;
+
+		auto& kernel = handle.fp16_tn_kernel[0];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	{
+		constexpr unsigned BLOCK_SIZE = 64;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_t;
+		constexpr auto OP_B = mtk::shgemm::op_n;
+
+		auto& kernel = handle.fp16_tn_kernel[1];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	/*=======================================
+		FP16-TT
+		=====================================*/
+	{
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_t;
+		constexpr auto OP_B = mtk::shgemm::op_t;
+
+		auto& kernel = handle.fp16_tt_kernel[0];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	{
+		constexpr unsigned BLOCK_SIZE = 64;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_t;
+		constexpr auto OP_B = mtk::shgemm::op_t;
+
+		auto& kernel = handle.fp16_tt_kernel[1];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
 }
 
 void mtk::shgemm::destroy(
