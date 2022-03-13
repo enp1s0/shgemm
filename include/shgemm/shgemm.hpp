@@ -53,10 +53,14 @@ struct shgemmHandle_t {
 	detail::kernel tf32_tn_kernel[detail::num_levels];
 	detail::kernel tf32_nt_kernel[detail::num_levels];
 	detail::kernel tf32_tt_kernel[detail::num_levels];
+
+	unsigned debug_mode = 0;
 };
 
 void create(shgemmHandle_t& handle);
 void destroy(shgemmHandle_t& handle);
+
+void set_debug_mode(shgemmHandle_t& handle, const unsigned on);
 
 void set_cuda_stream(shgemmHandle_t& handle, cudaStream_t const cuda_stream);
 

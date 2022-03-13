@@ -446,6 +446,17 @@ void mtk::shgemm::shgemm(
 	const dim3 grid_size((n + kernel.smem_n - 1) / kernel.smem_n, (m + kernel.smem_m - 1) / kernel.smem_m);
 	const dim3 block_size(kernel.block_size);
 
+	if (handle.debug_mode) {
+		std::printf("[shape=(%lu,%lu,%lu),op_a=%s,op_b=%s,compute_type=%s] kernel_ptr = %p, kernel_level = %u\n",
+				m, n, k,
+				op_a == mtk::shgemm::op_n ? "N" : "T",
+				op_b == mtk::shgemm::op_n ? "N" : "T",
+				compute_type == mtk::shgemm::tf32 ? "TF32" : "FP16",
+				kernel.func,
+				kernel_level
+				);
+	}
+
 	kernel.func<<<grid_size, block_size, kernel.smem_size, handle.cuda_stream>>>
 		(
 		 m, n, k,
@@ -455,4 +466,8 @@ void mtk::shgemm::shgemm(
 		 *beta_ptr,
 		 c_ptr, ldc
 		 );
+}
+
+void mtk::shgemm::set_debug_mode(mtk::shgemm::shgemmHandle_t& handle, const unsigned on) {
+	handle.debug_mode = on;
 }
