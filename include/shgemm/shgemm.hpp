@@ -5,17 +5,62 @@
 
 namespace mtk {
 namespace shgemm {
+namespace detail {
+typedef void (*kernel_func_t)(
+			const std::size_t,
+			const std::size_t,
+			const std::size_t,
+			const float,
+			const float* const, const std::size_t,
+			const half * const, const std::size_t,
+			const float,
+			float* const , const std::size_t
+			);
+
+struct kernel {
+	unsigned smem_m, smem_n;
+	unsigned num_blocks_filling;
+	unsigned block_size;
+	unsigned smem_size;
+
+	kernel_func_t func;
+};
+
+enum kernel_level {
+	P0 = 0, // small
+	P1 = 1, // Large
+	num_levels
+};
+}
 enum operation_t {
 	op_n,
 	op_t
 };
 
+enum tc_t {
+	fp16,
+	tf32
+};
+
 struct shgemmHandle_t {
 	cudaStream_t cuda_stream;
+
+	detail::kernel fp16_nn_kernel[detail::num_levels];
+	detail::kernel fp16_tn_kernel[detail::num_levels];
+	detail::kernel fp16_nt_kernel[detail::num_levels];
+	detail::kernel fp16_tt_kernel[detail::num_levels];
+	detail::kernel tf32_nn_kernel[detail::num_levels];
+	detail::kernel tf32_tn_kernel[detail::num_levels];
+	detail::kernel tf32_nt_kernel[detail::num_levels];
+	detail::kernel tf32_tt_kernel[detail::num_levels];
+
+	unsigned debug_mode = 0;
 };
 
 void create(shgemmHandle_t& handle);
 void destroy(shgemmHandle_t& handle);
+
+void set_debug_mode(shgemmHandle_t& handle, const unsigned on);
 
 void set_cuda_stream(shgemmHandle_t& handle, cudaStream_t const cuda_stream);
 
@@ -31,7 +76,8 @@ void shgemm(
 		const float* const a_ptr, const std::size_t lda,
 		const half * const b_ptr, const std::size_t ldb,
 		const float* const beta_ptr,
-		float* const c_ptr, const std::size_t ldc
+		float* const c_ptr, const std::size_t ldc,
+		const tc_t compute_type
 		);
 
 } // namespace shgemm

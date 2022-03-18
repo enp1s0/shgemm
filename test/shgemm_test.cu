@@ -10,6 +10,9 @@ constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 5;
 constexpr std::size_t max_log_DIM = 13;
 constexpr std::size_t log_DIM_interval = 3;
+constexpr auto compute_type = mtk::shgemm::tf32;
+constexpr auto op_a = mtk::shgemm::op_n;
+constexpr auto op_b = mtk::shgemm::op_n;
 
 mtk::mateval::major_t convert_op_shgemm2mateval(
 		const mtk::shgemm::operation_t op
@@ -39,7 +42,8 @@ void test_shgemm_core(
 		float* const c_fp32_ptr,
 		const std::size_t m,
 		const std::size_t n,
-		const std::size_t k
+		const std::size_t k,
+		const mtk::shgemm::tc_t compute_type
 		) {
 	const float alpha = 1.0f, beta = 0.0f;
 	mtk::shgemm::shgemm(
@@ -50,7 +54,8 @@ void test_shgemm_core(
 			a_fp32_ptr, k,
 			b_fp16_ptr, k,
 			&beta,
-			c_fp32_ptr, m
+			c_fp32_ptr, m,
+			compute_type
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
@@ -75,7 +80,8 @@ void test_shgemm_core(
 			a_fp32_ptr, k,
 			b_fp16_ptr, k,
 			&beta,
-			c_fp32_ptr, m
+			c_fp32_ptr, m,
+			compute_type
 			);
 	}
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
@@ -149,13 +155,14 @@ int main() {
 				const auto k = 1lu << log_K;
 				test_shgemm_core(
 						shgemm_handle,
-						mtk::shgemm::op_t,
-						mtk::shgemm::op_n,
+						op_a,
+						op_b,
 						a_fp32_uptr.get(),
 						b_fp32_uptr.get(),
 						b_fp16_uptr.get(),
 						c_fp32_uptr.get(),
-						m, n, k
+						m, n, k,
+						compute_type
 						);
 			}
 		}
