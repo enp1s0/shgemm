@@ -265,9 +265,9 @@ void mtk::shgemm::create(
 				);
 	}
 	{
-		constexpr unsigned BLOCK_SIZE = 64;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 128, SMEM_N = 64, SMEM_K = 16;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 16;
 		using TC_T = nvcuda::wmma::precision::tf32;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
