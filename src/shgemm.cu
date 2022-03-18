@@ -567,14 +567,14 @@ void mtk::shgemm::shgemm(
 	}
 
 	unsigned kernel_level = mtk::shgemm::detail::num_levels - 1;
-	auto kernel = kernel_list[kernel_level];
 	for (; kernel_level > 0; kernel_level--) {
-		kernel = kernel_list[kernel_level];
+		const auto kernel = kernel_list[kernel_level];
 		const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
 		if (num_blocks >= kernel.num_blocks_filling) {
 			break;
 		}
 	}
+	auto kernel = kernel_list[kernel_level];
 
 	const dim3 grid_size((n + kernel.smem_n - 1) / kernel.smem_n, (m + kernel.smem_m - 1) / kernel.smem_m);
 	const dim3 block_size(kernel.block_size);
