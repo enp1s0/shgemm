@@ -385,7 +385,7 @@ void mtk::shgemm::create(
 	{
 		constexpr unsigned BLOCK_SIZE = 128;
 		constexpr unsigned SMEM_M = 128, SMEM_N = 64, SMEM_K = 16;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 16, FRAG_K = 16;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 16;
 		using TC_T = half;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -399,8 +399,8 @@ void mtk::shgemm::create(
 	}
 	{
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
+		constexpr unsigned SMEM_M = 64 , SMEM_N = 128, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 64, FRAG_N = 32, FRAG_K = 32;
 		using TC_T = half;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
