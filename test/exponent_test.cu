@@ -232,8 +232,8 @@ int main() {
 
 	std::vector<std::pair<int, int>> exponent_list;
 	exponent_list.push_back(std::make_pair(-15, 14));
-	exponent_list.push_back(std::make_pair(-25, -15));
-	exponent_list.push_back(std::make_pair(-100, -25));
+	exponent_list.push_back(std::make_pair(-36, -15));
+	exponent_list.push_back(std::make_pair(-100, -36));
 
 	std::printf("matrix,imp,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
 	std::fflush(stdout);
