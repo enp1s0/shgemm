@@ -51,8 +51,8 @@ void test_shgemm_core(
 			op_a, op_b,
 			m, n, k,
 			&alpha,
-			a_fp32_ptr, k,
-			b_fp16_ptr, k,
+			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 			&beta,
 			c_fp32_ptr, m,
 			compute_type
@@ -77,8 +77,8 @@ void test_shgemm_core(
 			op_a, op_b,
 			m, n, k,
 			&alpha,
-			a_fp32_ptr, k,
-			b_fp16_ptr, k,
+			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 			&beta,
 			c_fp32_ptr, m,
 			compute_type
