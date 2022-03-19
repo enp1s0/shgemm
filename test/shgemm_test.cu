@@ -90,7 +90,8 @@ void test_shgemm_core(
 
 	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
 
-	std::printf("%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
+	std::printf("%s,%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
+			(compute_type == mtk::shgemm::fp16 ? "fp16" : "tf32"),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
@@ -145,7 +146,7 @@ int main() {
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
 
-	std::printf("m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
+	std::printf("tc_t,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
 	std::fflush(stdout);
 	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
 		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
