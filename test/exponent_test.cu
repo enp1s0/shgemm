@@ -8,7 +8,6 @@
 #include <cublas.h>
 #include <cublas_v2.h>
 
-constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 6;
 constexpr std::size_t max_log_DIM = 12;
 constexpr std::size_t log_DIM_interval = 2;
@@ -96,36 +95,13 @@ void test_shgemm_core(
 			b_fp32_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 			c_fp32_ptr, m
 			);
-
-	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
-	const auto start_clock = std::chrono::system_clock::now();
-	for (std::size_t test_c = 0; test_c < test_count; test_c++) {
-	mtk::shgemm::shgemm(
-			shgemm_handle,
-			op_a, op_b,
-			m, n, k,
-			&alpha,
-			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
-			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
-			&beta,
-			c_fp32_ptr, m,
-			compute_type
-			);
-	}
-	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
-	const auto end_clock = std::chrono::system_clock::now();
-	const auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() * 1e-6 / test_count;
-
-	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
-
-	std::printf("shgemm-%s,%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
+	std::printf("shgemm-%s,%lu,%lu,%lu,%s,%s,%e,%e\n",
 			(compute_type == mtk::shgemm::tf32 ? "tf32" : "fp16"),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
 			residual,
-			relative_max_error,
-			throughput
+			relative_max_error
 			);
 	std::fflush(stdout);
 }
@@ -170,34 +146,13 @@ void test_cublas(
 			c_fp32_ptr, m
 			);
 
-	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
-	const auto start_clock = std::chrono::system_clock::now();
-	for (std::size_t test_c = 0; test_c < test_count; test_c++) {
-		cublasSgemm(
-				cublas_handle,
-				op_a, op_b,
-				m, n, k,
-				&alpha,
-				a_fp32_ptr, (op_a == CUBLAS_OP_N ? m : k),
-				b_fp32_ptr, (op_b == CUBLAS_OP_N ? k : n),
-				&beta,
-				c_fp32_ptr, m
-				);
-	}
-	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
-	const auto end_clock = std::chrono::system_clock::now();
-	const auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() * 1e-6 / test_count;
-
-	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
-
-	std::printf("cublas-%s,%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
+	std::printf("cublas-%s,%lu,%lu,%lu,%s,%s,%e,%e\n",
 			mode.c_str(),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
 			residual,
-			relative_max_error,
-			throughput
+			relative_max_error
 			);
 	std::fflush(stdout);
 }
@@ -228,6 +183,33 @@ void convert_B_to_fp16(
 	cudaDeviceSynchronize();
 }
 
+__global__ void convert_A_exponent_dist_kernel(
+		float* const fp32_ptr,  // [in, out]
+		const int min_exponent, // [in]
+		const int max_exponent, // [in]
+		const std::size_t N     // [in]
+		) {
+	const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
+	if (tid >= N) return;
+	fp32_ptr[tid] = powf(2.f, fp32_ptr[tid] * (max_exponent - min_exponent) + min_exponent);
+}
+
+void convert_A_exponent_dist(
+		float* const fp32_ptr,
+		const int min_exponent, // [in]
+		const int max_exponent, // [in]
+		const std::size_t N
+		) {
+	constexpr unsigned block_size = 256;
+	convert_A_exponent_dist_kernel<<<(N + block_size - 1) / block_size, block_size>>>(
+			fp32_ptr,
+			min_exponent,
+			max_exponent,
+			N
+			);
+	cudaDeviceSynchronize();
+}
+
 int main() {
 	const auto max_N = 1lu << max_log_DIM;
 	auto a_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_N * max_N);
@@ -239,7 +221,6 @@ int main() {
 	auto cugen = cutf::curand::get_curand_unique_ptr(CURAND_RNG_PSEUDO_PHILOX4_32_10);
 	CUTF_CHECK_ERROR(curandSetPseudoRandomGeneratorSeed(*cugen.get(), seed));
 
-	CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), a_fp32_uptr.get(), max_N * max_N));
 	CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), b_fp32_uptr.get(), max_N * max_N));
 	convert_B_to_fp16(b_fp16_uptr.get(), b_fp32_uptr.get(), max_N * max_N);
 
@@ -249,56 +230,70 @@ int main() {
 	cublasHandle_t cublas_handle;
 	cublasCreate(&cublas_handle);
 
-	std::printf("imp,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
+	std::vector<std::pair<int, int>> exponent_list;
+	exponent_list.push_back(std::make_pair(-15, 14));
+	exponent_list.push_back(std::make_pair(-25, -15));
+	exponent_list.push_back(std::make_pair(-100, -25));
+
+	std::printf("matrix,imp,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
 	std::fflush(stdout);
-	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
-		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
-			for (std::size_t log_K = min_log_DIM; log_K <= max_log_DIM; log_K += log_DIM_interval) {
-				const auto m = 1lu << log_M;
-				const auto n = 1lu << log_N;
-				const auto k = 1lu << log_K;
-				test_shgemm_core(
-						shgemm_handle,
-						op_a,
-						op_b,
-						a_fp32_uptr.get(),
-						b_fp32_uptr.get(),
-						b_fp16_uptr.get(),
-						c_fp32_uptr.get(),
-						m, n, k,
-						mtk::shgemm::tf32
-						);
-				test_shgemm_core(
-						shgemm_handle,
-						op_a,
-						op_b,
-						a_fp32_uptr.get(),
-						b_fp32_uptr.get(),
-						b_fp16_uptr.get(),
-						c_fp32_uptr.get(),
-						m, n, k,
-						mtk::shgemm::fp16
-						);
-				test_cublas(
-						cublas_handle,
-						convert_op_shgemm2cublas(op_a),
-						convert_op_shgemm2cublas(op_b),
-						a_fp32_uptr.get(),
-						b_fp32_uptr.get(),
-						c_fp32_uptr.get(),
-						m, n, k,
-						"tf32"
-						);
-				test_cublas(
-						cublas_handle,
-						convert_op_shgemm2cublas(op_a),
-						convert_op_shgemm2cublas(op_b),
-						a_fp32_uptr.get(),
-						b_fp32_uptr.get(),
-						c_fp32_uptr.get(),
-						m, n, k,
-						"fp32"
-						);
+	for (const auto exponent_lim : exponent_list) {
+		CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), a_fp32_uptr.get(), max_N * max_N));
+		convert_A_exponent_dist(a_fp32_uptr.get(), exponent_lim.first, exponent_lim.second, max_N * max_N);
+		const std::string matrix_name = std::to_string(exponent_lim.first) + ":" + std::to_string(exponent_lim.second);
+		for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
+			for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
+				for (std::size_t log_K = min_log_DIM; log_K <= max_log_DIM; log_K += log_DIM_interval) {
+					const auto m = 1lu << log_M;
+					const auto n = 1lu << log_N;
+					const auto k = 1lu << log_K;
+					std::printf("%s,", matrix_name.c_str());
+					test_shgemm_core(
+							shgemm_handle,
+							op_a,
+							op_b,
+							a_fp32_uptr.get(),
+							b_fp32_uptr.get(),
+							b_fp16_uptr.get(),
+							c_fp32_uptr.get(),
+							m, n, k,
+							mtk::shgemm::tf32
+							);
+					std::printf("%s,", matrix_name.c_str());
+					test_shgemm_core(
+							shgemm_handle,
+							op_a,
+							op_b,
+							a_fp32_uptr.get(),
+							b_fp32_uptr.get(),
+							b_fp16_uptr.get(),
+							c_fp32_uptr.get(),
+							m, n, k,
+							mtk::shgemm::fp16
+							);
+					std::printf("%s,", matrix_name.c_str());
+					test_cublas(
+							cublas_handle,
+							convert_op_shgemm2cublas(op_a),
+							convert_op_shgemm2cublas(op_b),
+							a_fp32_uptr.get(),
+							b_fp32_uptr.get(),
+							c_fp32_uptr.get(),
+							m, n, k,
+							"tf32"
+							);
+					std::printf("%s,", matrix_name.c_str());
+					test_cublas(
+							cublas_handle,
+							convert_op_shgemm2cublas(op_a),
+							convert_op_shgemm2cublas(op_b),
+							a_fp32_uptr.get(),
+							b_fp32_uptr.get(),
+							c_fp32_uptr.get(),
+							m, n, k,
+							"fp32"
+							);
+				}
 			}
 		}
 	}
