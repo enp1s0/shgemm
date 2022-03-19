@@ -25,7 +25,6 @@ file(GLOB HEADERS "${INCDIR}/shgemm/*.hpp")
 SET(lib_name shgemm)
 add_library(${lib_name} STATIC
 	${SRCDIR}/shgemm.cu
-	${SRCDIR}/wmmae_shgemm.hpp
 	${HEADERS}
 	)
 
@@ -56,7 +55,7 @@ if (${BUILD_SHGEMM_TEST})
 	# Directory
 	set(TESTSRCDIR test)
 
-	foreach(test shgemm)
+	foreach(test shgemm exponent)
 		set(test_out ${test}.test)
 		add_executable(${test_out} ${TESTSRCDIR}/${test}_test.cu ${HEADERS})
 		target_include_directories(${test_out} PRIVATE ${INCDIR})
