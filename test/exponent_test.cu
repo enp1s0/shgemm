@@ -14,7 +14,7 @@ constexpr std::size_t log_DIM_interval = 2;
 constexpr auto op_a = mtk::shgemm::op_n;
 constexpr auto op_b = mtk::shgemm::op_n;
 
-mtk::mateval::major_t convert_op_shgemm2mateval(
+mtk::mateval::layout_t convert_op_shgemm2mateval(
 		const mtk::shgemm::operation_t op
 		) {
 	if (op == mtk::shgemm::op_n) {
@@ -32,7 +32,7 @@ cublasOperation_t convert_op_shgemm2cublas(
 	return CUBLAS_OP_T;
 }
 
-mtk::mateval::major_t convert_op_cublas2mateval(
+mtk::mateval::layout_t convert_op_cublas2mateval(
 		const cublasOperation_t op
 		) {
 	if (op == CUBLAS_OP_N) {
@@ -86,7 +86,8 @@ void test_shgemm_core(
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
-	const auto [relative_max_error, residual] = mtk::mateval::cuda::max_relative_error_and_residual_AxB(
+	const auto error = mtk::mateval::cuda::get_error_AxB(
+			mtk::mateval::max_relative_error | mtk::mateval::relative_residual,
 			m, n, k,
 			convert_op_shgemm2mateval(op_a),
 			convert_op_shgemm2mateval(op_b),
@@ -100,8 +101,8 @@ void test_shgemm_core(
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
-			residual,
-			relative_max_error
+			error.at(mtk::mateval::max_relative_error),
+			error.at(mtk::mateval::relative_residual)
 			);
 	std::fflush(stdout);
 }
@@ -136,7 +137,8 @@ void test_cublas(
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
-	const auto [relative_max_error, residual] = mtk::mateval::cuda::max_relative_error_and_residual_AxB(
+	const auto error = mtk::mateval::cuda::get_error_AxB(
+			mtk::mateval::max_relative_error | mtk::mateval::relative_residual,
 			m, n, k,
 			convert_op_cublas2mateval(op_a),
 			convert_op_cublas2mateval(op_b),
@@ -151,8 +153,8 @@ void test_cublas(
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
-			residual,
-			relative_max_error
+			error.at(mtk::mateval::max_relative_error),
+			error.at(mtk::mateval::relative_residual)
 			);
 	std::fflush(stdout);
 }

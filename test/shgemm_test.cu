@@ -14,7 +14,7 @@ constexpr auto compute_type = mtk::shgemm::tf32;
 constexpr auto op_a = mtk::shgemm::op_n;
 constexpr auto op_b = mtk::shgemm::op_n;
 
-mtk::mateval::major_t convert_op_shgemm2mateval(
+mtk::mateval::layout_t convert_op_shgemm2mateval(
 		const mtk::shgemm::operation_t op
 		) {
 	if (op == mtk::shgemm::op_n) {
@@ -59,7 +59,8 @@ void test_shgemm_core(
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
-	const auto [relative_max_error, residual] = mtk::mateval::cuda::max_relative_error_and_residual_AxB(
+	const auto error = mtk::mateval::cuda::get_error_AxB(
+			mtk::mateval::max_relative_error | mtk::mateval::relative_residual,
 			m, n, k,
 			convert_op_shgemm2mateval(op_a),
 			convert_op_shgemm2mateval(op_b),
@@ -72,17 +73,17 @@ void test_shgemm_core(
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 	const auto start_clock = std::chrono::system_clock::now();
 	for (std::size_t test_c = 0; test_c < test_count; test_c++) {
-	mtk::shgemm::shgemm(
-			shgemm_handle,
-			op_a, op_b,
-			m, n, k,
-			&alpha,
-			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
-			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
-			&beta,
-			c_fp32_ptr, m,
-			compute_type
-			);
+		mtk::shgemm::shgemm(
+				shgemm_handle,
+				op_a, op_b,
+				m, n, k,
+				&alpha,
+				a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+				b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
+				&beta,
+				c_fp32_ptr, m,
+				compute_type
+				);
 	}
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 	const auto end_clock = std::chrono::system_clock::now();
@@ -94,8 +95,8 @@ void test_shgemm_core(
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
-			residual,
-			relative_max_error,
+			error.at(mtk::mateval::max_relative_error),
+			error.at(mtk::mateval::relative_residual),
 			throughput
 			);
 	std::fflush(stdout);
