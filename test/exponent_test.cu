@@ -11,6 +11,7 @@
 constexpr std::size_t min_log_DIM = 6;
 constexpr std::size_t max_log_DIM = 12;
 constexpr std::size_t log_DIM_interval = 2;
+constexpr unsigned num_tests = 16;
 constexpr auto op_a = mtk::shgemm::op_n;
 constexpr auto op_b = mtk::shgemm::op_n;
 
@@ -73,36 +74,42 @@ void test_shgemm_core(
 		const mtk::shgemm::tc_t compute_type
 		) {
 	const float alpha = 1.0f, beta = 0.0f;
-	mtk::shgemm::shgemm(
-			shgemm_handle,
-			op_a, op_b,
-			m, n, k,
-			&alpha,
-			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
-			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
-			&beta,
-			c_fp32_ptr, m,
-			compute_type
-			);
-	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
+	std::vector<double> residual_list;
+	std::vector<double> max_error_list;
+	for (unsigned i = 0; i < num_tests; i++) {
+		mtk::shgemm::shgemm(
+				shgemm_handle,
+				op_a, op_b,
+				m, n, k,
+				&alpha,
+				a_fp32_ptr + i * 16, (op_a == mtk::shgemm::op_n ? m : k),
+				b_fp16_ptr + i * 16, (op_b == mtk::shgemm::op_n ? k : n),
+				&beta,
+				c_fp32_ptr, m,
+				compute_type
+				);
+		CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
-	const auto error = mtk::mateval::cuda::get_error_AxB(
-			mtk::mateval::max_relative_error | mtk::mateval::relative_residual,
-			m, n, k,
-			convert_op_shgemm2mateval(op_a),
-			convert_op_shgemm2mateval(op_b),
-			mtk::mateval::col_major,
-			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
-			b_fp32_ptr, (op_b == mtk::shgemm::op_n ? k : n),
-			c_fp32_ptr, m
-			);
+		const auto error = mtk::mateval::cuda::get_error_AxB(
+				mtk::mateval::max_relative_error | mtk::mateval::relative_residual,
+				m, n, k,
+				convert_op_shgemm2mateval(op_a),
+				convert_op_shgemm2mateval(op_b),
+				mtk::mateval::col_major,
+				a_fp32_ptr + i * 16, (op_a == mtk::shgemm::op_n ? m : k),
+				b_fp32_ptr + i * 16, (op_b == mtk::shgemm::op_n ? k : n),
+				c_fp32_ptr, m
+				);
+		max_error_list.push_back(error.at(mtk::mateval::max_relative_error));
+		residual_list.push_back(error.at(mtk::mateval::relative_residual));
+	}
 	std::printf("shgemm-%s,%lu,%lu,%lu,%s,%s,%e,%e\n",
 			(compute_type == mtk::shgemm::tf32 ? "tf32" : "fp16"),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
-			error.at(mtk::mateval::max_relative_error),
-			error.at(mtk::mateval::relative_residual)
+			mtk::mateval::utils::calc_mean_and_var(max_error_list).first,
+			mtk::mateval::utils::calc_mean_and_var(residual_list).first
 			);
 	std::fflush(stdout);
 }
@@ -125,36 +132,42 @@ void test_cublas(
 		cublasSetMathMode(cublas_handle, CUBLAS_DEFAULT_MATH);
 	}
 	const float alpha = 1.0f, beta = 0.0f;
-	cublasSgemm(
-			cublas_handle,
-			op_a, op_b,
-			m, n, k,
-			&alpha,
-			a_fp32_ptr, (op_a == CUBLAS_OP_N ? m : k),
-			b_fp32_ptr, (op_b == CUBLAS_OP_N ? k : n),
-			&beta,
-			c_fp32_ptr, m
-			);
-	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
+	std::vector<double> residual_list;
+	std::vector<double> max_error_list;
+	for (unsigned i = 0; i < num_tests; i++) {
+		cublasSgemm(
+				cublas_handle,
+				op_a, op_b,
+				m, n, k,
+				&alpha,
+				a_fp32_ptr + i * 16, (op_a == CUBLAS_OP_N ? m : k),
+				b_fp32_ptr + i * 16, (op_b == CUBLAS_OP_N ? k : n),
+				&beta,
+				c_fp32_ptr, m
+				);
+		CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
-	const auto error = mtk::mateval::cuda::get_error_AxB(
-			mtk::mateval::max_relative_error | mtk::mateval::relative_residual,
-			m, n, k,
-			convert_op_cublas2mateval(op_a),
-			convert_op_cublas2mateval(op_b),
-			mtk::mateval::col_major,
-			a_fp32_ptr, (op_a == CUBLAS_OP_N ? m : k),
-			b_fp32_ptr, (op_b == CUBLAS_OP_N ? k : n),
-			c_fp32_ptr, m
-			);
+		const auto error = mtk::mateval::cuda::get_error_AxB(
+				mtk::mateval::max_relative_error | mtk::mateval::relative_residual,
+				m, n, k,
+				convert_op_cublas2mateval(op_a),
+				convert_op_cublas2mateval(op_b),
+				mtk::mateval::col_major,
+				a_fp32_ptr + i * 16, (op_a == CUBLAS_OP_N ? m : k),
+				b_fp32_ptr + i * 16, (op_b == CUBLAS_OP_N ? k : n),
+				c_fp32_ptr, m
+				);
+		max_error_list.push_back(error.at(mtk::mateval::max_relative_error));
+		residual_list.push_back(error.at(mtk::mateval::relative_residual));
+	}
 
 	std::printf("cublas-%s,%lu,%lu,%lu,%s,%s,%e,%e\n",
 			mode.c_str(),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
-			error.at(mtk::mateval::max_relative_error),
-			error.at(mtk::mateval::relative_residual)
+			mtk::mateval::utils::calc_mean_and_var(max_error_list).first,
+			mtk::mateval::utils::calc_mean_and_var(residual_list).first
 			);
 	std::fflush(stdout);
 }
@@ -214,17 +227,17 @@ void convert_A_exponent_dist(
 
 int main() {
 	const auto max_N = 1lu << max_log_DIM;
-	auto a_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_N * max_N);
-	auto b_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_N * max_N);
-	auto b_fp16_uptr = cutf::memory::get_device_unique_ptr<half >(max_N * max_N);
-	auto c_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_N * max_N);
+	auto a_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_N * max_N + num_tests * 16);
+	auto b_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_N * max_N + num_tests * 16);
+	auto b_fp16_uptr = cutf::memory::get_device_unique_ptr<half >(max_N * max_N + num_tests * 16);
+	auto c_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_N * max_N + num_tests * 16);
 
 	const auto seed = 10lu;
 	auto cugen = cutf::curand::get_curand_unique_ptr(CURAND_RNG_PSEUDO_PHILOX4_32_10);
 	CUTF_CHECK_ERROR(curandSetPseudoRandomGeneratorSeed(*cugen.get(), seed));
 
-	CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), b_fp32_uptr.get(), max_N * max_N));
-	convert_B_to_fp16(b_fp16_uptr.get(), b_fp32_uptr.get(), max_N * max_N);
+	CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), b_fp32_uptr.get(), max_N * max_N + num_tests * 16));
+	convert_B_to_fp16(b_fp16_uptr.get(), b_fp32_uptr.get(), max_N * max_N + num_tests * 16);
 
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
@@ -240,8 +253,8 @@ int main() {
 	std::printf("matrix,imp,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
 	std::fflush(stdout);
 	for (const auto exponent_lim : exponent_list) {
-		CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), a_fp32_uptr.get(), max_N * max_N));
-		convert_A_exponent_dist(a_fp32_uptr.get(), exponent_lim.first, exponent_lim.second, max_N * max_N);
+		CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), a_fp32_uptr.get(), max_N * max_N + num_tests * 16));
+		convert_A_exponent_dist(a_fp32_uptr.get(), exponent_lim.first, exponent_lim.second, max_N * max_N + num_tests * 16);
 		const std::string matrix_name = std::to_string(exponent_lim.first) + ":" + std::to_string(exponent_lim.second);
 		for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
 			for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
