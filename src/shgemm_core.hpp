@@ -18,9 +18,9 @@ __device__ unsigned calculate_mem_A_offset(const unsigned matrix_id_m, const uns
 template <class LAYOUT, unsigned SMEM_K, unsigned SMEM_N, unsigned FRAG_N>
 __device__ unsigned calculate_mem_B_offset(const unsigned matrix_id_n, const unsigned k) {
 	if constexpr (std::is_same<LAYOUT, mtk::shgemm::utils::col_major>::value) {
-		return matrix_id_n * FRAG_N * (SMEM_K + mtk::shgemm::device::A_smem_skew) + k;
+		return matrix_id_n * FRAG_N * (SMEM_K + mtk::shgemm::device::B_smem_skew) + k;
 	}
-	return matrix_id_n * FRAG_N + k * (SMEM_N + mtk::shgemm::device::A_smem_skew);
+	return matrix_id_n * FRAG_N + k * (SMEM_N + mtk::shgemm::device::B_smem_skew);
 }
 
 template<
