@@ -202,6 +202,11 @@ void shgemm_kernel_launcher(
 		 );
 }
 
+template <mtk::shgemm::operation_t op_t>
+struct op_t2layout {using type = void;};
+template <> struct op_t2layout<mtk::shgemm::op_n> {using type = mtk::shgemm::utils::col_major;};
+template <> struct op_t2layout<mtk::shgemm::op_t> {using type = mtk::shgemm::utils::row_major;};
+
 template<
 	unsigned SMEM_M,
 	unsigned SMEM_N,
@@ -219,7 +224,7 @@ void set_kernel(
 		const unsigned num_sm
 		) {
 		const auto func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
-		constexpr unsigned smem_size = get_shared_memory_size_in_byte(2, SMEM_M, SMEM_N, SMEM_K);
+		const unsigned smem_size = get_shared_memory_size_in_byte<SMEM_M, SMEM_N, SMEM_K, NUM_STAGES, typename op_t2layout<op_a>::type, typename op_t2layout<op_b>::type>();
 
 		int max_block_per_ms;
 		CUTF_CHECK_ERROR(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_block_per_ms, *func, BLOCK_SIZE, smem_size));
