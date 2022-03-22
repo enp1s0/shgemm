@@ -10,8 +10,11 @@ constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 5;
 constexpr std::size_t max_log_DIM = 13;
 constexpr std::size_t log_DIM_interval = 3;
+constexpr auto compute_type = mtk::shgemm::tf32;
+constexpr auto op_a = mtk::shgemm::op_n;
+constexpr auto op_b = mtk::shgemm::op_n;
 
-mtk::mateval::major_t convert_op_shgemm2mateval(
+mtk::mateval::layout_t convert_op_shgemm2mateval(
 		const mtk::shgemm::operation_t op
 		) {
 	if (op == mtk::shgemm::op_n) {
@@ -39,7 +42,8 @@ void test_shgemm_core(
 		float* const c_fp32_ptr,
 		const std::size_t m,
 		const std::size_t n,
-		const std::size_t k
+		const std::size_t k,
+		const mtk::shgemm::tc_t compute_type
 		) {
 	const float alpha = 1.0f, beta = 0.0f;
 	mtk::shgemm::shgemm(
@@ -47,14 +51,16 @@ void test_shgemm_core(
 			op_a, op_b,
 			m, n, k,
 			&alpha,
-			a_fp32_ptr, k,
-			b_fp16_ptr, k,
+			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 			&beta,
-			c_fp32_ptr, m
+			c_fp32_ptr, m,
+			compute_type
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
-	const auto [relative_max_error, residual] = mtk::mateval::cuda::max_relative_error_and_residual_AxB(
+	const auto error = mtk::mateval::cuda::get_error_AxB(
+			mtk::mateval::max_relative_error | mtk::mateval::relative_residual,
 			m, n, k,
 			convert_op_shgemm2mateval(op_a),
 			convert_op_shgemm2mateval(op_b),
@@ -67,16 +73,17 @@ void test_shgemm_core(
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 	const auto start_clock = std::chrono::system_clock::now();
 	for (std::size_t test_c = 0; test_c < test_count; test_c++) {
-	mtk::shgemm::shgemm(
-			shgemm_handle,
-			op_a, op_b,
-			m, n, k,
-			&alpha,
-			a_fp32_ptr, k,
-			b_fp16_ptr, k,
-			&beta,
-			c_fp32_ptr, m
-			);
+		mtk::shgemm::shgemm(
+				shgemm_handle,
+				op_a, op_b,
+				m, n, k,
+				&alpha,
+				a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+				b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
+				&beta,
+				c_fp32_ptr, m,
+				compute_type
+				);
 	}
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 	const auto end_clock = std::chrono::system_clock::now();
@@ -84,12 +91,13 @@ void test_shgemm_core(
 
 	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
 
-	std::printf("%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
+	std::printf("%s,%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
+			(compute_type == mtk::shgemm::fp16 ? "fp16" : "tf32"),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
-			residual,
-			relative_max_error,
+			error.at(mtk::mateval::max_relative_error),
+			error.at(mtk::mateval::relative_residual),
 			throughput
 			);
 	std::fflush(stdout);
@@ -139,7 +147,7 @@ int main() {
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
 
-	std::printf("m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
+	std::printf("tc_t,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
 	std::fflush(stdout);
 	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
 		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
@@ -149,13 +157,14 @@ int main() {
 				const auto k = 1lu << log_K;
 				test_shgemm_core(
 						shgemm_handle,
-						mtk::shgemm::op_t,
-						mtk::shgemm::op_n,
+						op_a,
+						op_b,
 						a_fp32_uptr.get(),
 						b_fp32_uptr.get(),
 						b_fp16_uptr.get(),
 						c_fp32_uptr.get(),
-						m, n, k
+						m, n, k,
+						compute_type
 						);
 			}
 		}
