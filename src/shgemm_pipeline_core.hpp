@@ -72,6 +72,9 @@ struct shgemm_pipeline_core<
 	B_DMEM_LOADER b_dram_loader;
 	SHGEMM_CORE shgemm_core;
 
+	constexpr unsigned A_smem_size = mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, typename A_DMEM_LOADER::layout>::value;
+	constexpr unsigned B_smem_size = mtk::shgemm::device::get_B_smem_size<SMEM_K, SMEM_N, typename B_DMEM_LOADER::layout>::value;
+
 	std::size_t block_k = 0;
 	a_dram_loader(a_smem_ptr,
 			blockIdx.y * SMEM_M, block_k,
@@ -96,28 +99,28 @@ struct shgemm_pipeline_core<
 	// MMA
 #pragma unroll
 	for (; block_k < k; block_k += SMEM_K) {
-		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, typename A_DMEM_LOADER::layout>::value,
+		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * A_smem_size,
 				blockIdx.y * SMEM_M, block_k,
 				m, k,
 				a_dmem_ptr, lda
 				);
-		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * mtk::shgemm::device::get_B_smem_size<SMEM_K, SMEM_N, typename B_DMEM_LOADER::layout>::value,
+		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * B_smem_size,
 				block_k, blockIdx.x * SMEM_N,
 				k, n,
 				b_dmem_ptr, ldb
 				);
 
 		shgemm_core(frag_c,
-				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
-				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
+				a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * A_smem_size,
+				b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * B_smem_size
 				);
 		cutf::cp_async::wait_all();
 		__syncthreads();
 	}
 
 	shgemm_core(frag_c,
-			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_M,
-			b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * SMEM_K * SMEM_N
+			a_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * A_smem_size,
+			b_smem_ptr + (1 - ((block_k / SMEM_K) & 0x1)) * B_smem_size
 			);
 	}
 };
