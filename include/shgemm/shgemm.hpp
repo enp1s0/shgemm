@@ -55,10 +55,15 @@ struct shgemmHandle_t {
 	detail::kernel tf32_tt_kernel[detail::num_levels];
 
 	unsigned debug_mode = 0;
+
+	detail::kernel_level fixed_lernel_level;
 };
 
 void create(shgemmHandle_t& handle);
 void destroy(shgemmHandle_t& handle);
+
+void enable_kernel_level_fixing(shgemmHandle_t& handle, const detail::kernel_level kernel_level);
+void disable_kernel_level_fixing(shgemmHandle_t& handle);
 
 void set_debug_mode(shgemmHandle_t& handle, const unsigned on);
 
