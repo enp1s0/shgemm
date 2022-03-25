@@ -65,8 +65,8 @@ void test_shgemm_core(
 			convert_op_shgemm2mateval(op_a),
 			convert_op_shgemm2mateval(op_b),
 			mtk::mateval::col_major,
-			a_fp32_ptr, k,
-			b_fp32_ptr, k,
+			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+			b_fp32_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 			c_fp32_ptr, m
 			);
 
