@@ -244,6 +244,7 @@ void mtk::shgemm::create(
 		mtk::shgemm::shgemmHandle_t &handle
 		) {
 	handle.cuda_stream = 0;
+	handle.fixed_lernel_level = detail::num_levels;
 
 	cudaDeviceProp prop;
 	cudaGetDeviceProperties(&prop, 0);
@@ -527,6 +528,18 @@ void mtk::shgemm::set_cuda_stream(
 	handle.cuda_stream = cuda_stream;
 }
 
+void mtk::shgemm::enable_kernel_level_fixing(
+		mtk::shgemm::shgemmHandle_t &handle,
+		const mtk::shgemm::detail::kernel_level kernel_level) {
+	handle.fixed_lernel_level = kernel_level;
+}
+
+void mtk::shgemm::disable_kernel_level_fixing(
+		mtk::shgemm::shgemmHandle_t& handle
+		) {
+	handle.fixed_lernel_level = mtk::shgemm::detail::num_levels;
+}
+
 void mtk::shgemm::shgemm(
 		const mtk::shgemm::shgemmHandle_t handle,
 		const mtk::shgemm::operation_t op_a,
@@ -569,12 +582,17 @@ void mtk::shgemm::shgemm(
 	}
 
 	unsigned kernel_level = mtk::shgemm::detail::num_levels - 1;
-	for (; kernel_level > 0; kernel_level--) {
-		const auto kernel = kernel_list[kernel_level];
-		const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
-		if (num_blocks >= kernel.num_blocks_filling) {
-			break;
+	if (handle.fixed_lernel_level >= detail::num_levels) {
+		kernel_level = mtk::shgemm::detail::num_levels - 1;
+		for (; kernel_level > 0; kernel_level--) {
+			const auto kernel = kernel_list[kernel_level];
+			const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
+			if (num_blocks >= kernel.num_blocks_filling) {
+				break;
+			}
 		}
+	} else {
+		kernel_level = handle.fixed_lernel_level;
 	}
 	auto kernel = kernel_list[kernel_level];
 
