@@ -17,8 +17,8 @@ template <class TC_T>
 using B_Policy = typename mtk::wmma::tcec::detail::default_policy<TC_T, mtk::wmma::tcec::op_without_error_correction, mtk::wmma::tcec::op_mma>::type;
 
 // CAUTION: The skew is not suoorted yet
-constexpr unsigned A_smem_skew = 4;
-constexpr unsigned B_smem_skew = 4;
+constexpr unsigned A_smem_skew = 8;
+constexpr unsigned B_smem_skew = 8;
 
 template <unsigned SMEM_M, unsigned SMEM_K, class Layout>
 struct get_A_smem_size{const static unsigned value = 0;};
