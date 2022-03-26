@@ -292,7 +292,7 @@ void mtk::shgemm::create(
 		=====================================*/
 	{
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 128;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
 		using TC_T = nvcuda::wmma::precision::tf32;
 
@@ -306,9 +306,9 @@ void mtk::shgemm::create(
 				);
 	}
 	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 128, SMEM_N = 64, SMEM_K = 16;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 16, FRAG_K = 16;
+		constexpr unsigned BLOCK_SIZE = 256;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		using TC_T = nvcuda::wmma::precision::tf32;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -424,8 +424,8 @@ void mtk::shgemm::create(
 		FP16-NN
 		=====================================*/
 	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
+		constexpr unsigned BLOCK_SIZE = 256;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 128;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
 		using TC_T = half;
 
@@ -439,9 +439,9 @@ void mtk::shgemm::create(
 				);
 	}
 	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64 , SMEM_N = 128, SMEM_K = 64;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 16;
+		constexpr unsigned BLOCK_SIZE = 256;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		using TC_T = half;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
