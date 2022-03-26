@@ -45,7 +45,7 @@ __global__ void shgemm_kernel(
 
 	extern __shared__ float smem[];
 	float* const a_smem_ptr = smem;
-	half * const b_smem_ptr = reinterpret_cast<half*>(a_smem_ptr + SMEM_K * SMEM_M * NUM_STAGES);
+	half * const b_smem_ptr = reinterpret_cast<half*>(a_smem_ptr + mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, typename A_DMEM_LOADER::layout>::value * NUM_STAGES);
 
 	mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[(SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)];
 
@@ -94,14 +94,11 @@ constexpr unsigned size_of = 0;
 template <> constexpr unsigned size_of<float> = 4;
 template <> constexpr unsigned size_of<half > = 2;
 
-constexpr unsigned get_shared_memory_size_in_byte(
-		const unsigned NUM_STAGES,
-		const unsigned SMEM_M,
-		const unsigned SMEM_N,
-		const unsigned SMEM_K
+template <unsigned SMEM_M, unsigned SMEM_N, unsigned SMEM_K, unsigned NUM_STAGES, class A_layout, class B_layout>
+unsigned get_shared_memory_size_in_byte(
 		) {
-	return std::max(NUM_STAGES * SMEM_M * SMEM_K * size_of<float> +
-		NUM_STAGES * SMEM_K * SMEM_N * size_of<half>,
+	return std::max(NUM_STAGES * (mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, A_layout>::value) * size_of<float> +
+		NUM_STAGES * (mtk::shgemm::device::get_B_smem_size<SMEM_K, SMEM_N, B_layout>::value) * size_of<half>,
 		SMEM_M * SMEM_N * size_of<float>);
 }
 
@@ -151,6 +148,38 @@ struct kernel_ptr {
 					>);
 };
 
+template<
+	unsigned SMEM_M,
+	unsigned SMEM_N,
+	unsigned SMEM_K,
+	unsigned FRAG_M,
+	unsigned FRAG_N,
+	unsigned FRAG_K,
+	unsigned NUM_STAGES,
+	unsigned BLOCK_SIZE,
+	class TC_T,
+	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
+	>
+struct pipline_kernel_ptr {
+	using A_DMEM_LOADER = typename loader_selector<op_a, float, SMEM_M, SMEM_K, BLOCK_SIZE>::type;
+	using B_DMEM_LOADER = typename loader_selector<op_b, half , SMEM_K, SMEM_N, BLOCK_SIZE>::type;
+	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
+	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
+
+	constexpr static mtk::shgemm::detail::kernel_func_t func =
+				&(shgemm_kernel<
+					SMEM_M, SMEM_N, SMEM_K,
+					FRAG_M, FRAG_N, FRAG_K,
+					A_DMEM_LOADER,
+					B_DMEM_LOADER,
+					C_DMEM_STORER,
+					SHGEMM_CORE,
+					NUM_STAGES,
+					BLOCK_SIZE,
+					TC_T
+					>);
+};
+
 template <mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b>
 void shgemm_kernel_launcher(
 		const mtk::shgemm::shgemmHandle_t handle,
@@ -178,7 +207,7 @@ void shgemm_kernel_launcher(
 	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
 	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
 
-	constexpr auto smem_size = get_shared_memory_size_in_byte(NUM_STAGES, SMEM_M, SMEM_N, SMEM_K);
+	const auto smem_size = get_shared_memory_size_in_byte<SMEM_M, SMEM_N, SMEM_K, NUM_STAGES, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>();
 	const dim3 grid_size((n + SMEM_N - 1) / SMEM_N, (m + SMEM_M - 1) / SMEM_M);
 	const dim3 block_size(BLOCK_SIZE);
 
@@ -205,6 +234,11 @@ void shgemm_kernel_launcher(
 		 );
 }
 
+template <mtk::shgemm::operation_t op_t>
+struct op_t2layout {using type = void;};
+template <> struct op_t2layout<mtk::shgemm::op_n> {using type = mtk::shgemm::utils::col_major;};
+template <> struct op_t2layout<mtk::shgemm::op_t> {using type = mtk::shgemm::utils::row_major;};
+
 template<
 	unsigned SMEM_M,
 	unsigned SMEM_N,
@@ -215,26 +249,32 @@ template<
 	unsigned NUM_STAGES,
 	unsigned BLOCK_SIZE,
 	class TC_T,
-	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
+	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b,
+	unsigned PIPLINE_CORE = 0
 	>
 void set_kernel(
 		mtk::shgemm::detail::kernel& kernel,
 		const unsigned num_sm
 		) {
-		const auto func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
-		constexpr unsigned smem_size = get_shared_memory_size_in_byte(2, SMEM_M, SMEM_N, SMEM_K);
+	mtk::shgemm::detail::kernel_func_t func;
+	if (PIPLINE_CORE) {
+		func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+	} else {
+		func = pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+	}
+	const unsigned smem_size = get_shared_memory_size_in_byte<SMEM_M, SMEM_N, SMEM_K, NUM_STAGES, typename op_t2layout<op_a>::type, typename op_t2layout<op_b>::type>();
 
-		int max_block_per_ms;
-		CUTF_CHECK_ERROR(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_block_per_ms, *func, BLOCK_SIZE, smem_size));
+	int max_block_per_ms;
+	CUTF_CHECK_ERROR(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_block_per_ms, *func, BLOCK_SIZE, smem_size));
 
-		CUTF_CHECK_ERROR(cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+	CUTF_CHECK_ERROR(cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
 
-		kernel.func = func;
-		kernel.num_blocks_filling = max_block_per_ms * num_sm;
-		kernel.smem_m = SMEM_M;
-		kernel.smem_n = SMEM_N;
-		kernel.block_size = BLOCK_SIZE;
-		kernel.smem_size = smem_size;
+	kernel.func = func;
+	kernel.num_blocks_filling = max_block_per_ms * num_sm;
+	kernel.smem_m = SMEM_M;
+	kernel.smem_n = SMEM_N;
+	kernel.block_size = BLOCK_SIZE;
+	kernel.smem_size = smem_size;
 }
 } // noname namespace
 
@@ -252,7 +292,7 @@ void mtk::shgemm::create(
 		=====================================*/
 	{
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 128;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
 		using TC_T = nvcuda::wmma::precision::tf32;
 
@@ -266,9 +306,9 @@ void mtk::shgemm::create(
 				);
 	}
 	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 128, SMEM_N = 64, SMEM_K = 16;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 16;
+		constexpr unsigned BLOCK_SIZE = 256;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		using TC_T = nvcuda::wmma::precision::tf32;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -276,7 +316,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.tf32_nn_kernel[1];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, 1>(
 				kernel, num_sm
 				);
 	}
@@ -384,9 +424,9 @@ void mtk::shgemm::create(
 		FP16-NN
 		=====================================*/
 	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 128, SMEM_N = 64, SMEM_K = 16;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 16;
+		constexpr unsigned BLOCK_SIZE = 256;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 128;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
 		using TC_T = half;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -399,9 +439,9 @@ void mtk::shgemm::create(
 				);
 	}
 	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64 , SMEM_N = 128, SMEM_K = 32;
-		constexpr unsigned FRAG_M = 64, FRAG_N = 32, FRAG_K = 32;
+		constexpr unsigned BLOCK_SIZE = 256;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		using TC_T = half;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;

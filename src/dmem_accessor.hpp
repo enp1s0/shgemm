@@ -28,9 +28,10 @@ struct dmem_loader_n {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::A_smem_skew);
 
 					// 128 bit memory access
-					cutf::cp_async::cp_async<16>(&smem_ptr[i], &dmem_ptr[dmem_index]);
+					cutf::cp_async::cp_async<16>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
 				}
 			} else if ((ldd & 0x1) == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
@@ -38,9 +39,10 @@ struct dmem_loader_n {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::A_smem_skew);
 
 					// 64 bit memory access
-					cutf::cp_async::cp_async<8>(&smem_ptr[i], &dmem_ptr[dmem_index]);
+					cutf::cp_async::cp_async<8>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
 				}
 			} else {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
@@ -48,8 +50,9 @@ struct dmem_loader_n {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::A_smem_skew);
 
-					cutf::cp_async::cp_async<4>(&smem_ptr[i], &dmem_ptr[dmem_index]);
+					cutf::cp_async::cp_async<4>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
 				}
 			}
 		} else {
@@ -58,11 +61,12 @@ struct dmem_loader_n {
 				const auto m = (i % SMEM_M) + dmem_start_m;
 				const auto n = (i / SMEM_M) + dmem_start_n;
 				const auto dmem_index = m + n * ldd;
+				const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::A_smem_skew);
 
 				if (m < dmem_size_m && n < dmem_size_n) {
-					cutf::cp_async::cp_async<4>(&smem_ptr[i], &dmem_ptr[dmem_index]);
+					cutf::cp_async::cp_async<4>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
 				} else {
-					smem_ptr[i] = 0.f;
+					smem_ptr[smem_index] = 0.f;
 				}
 			}
 		}
@@ -86,8 +90,9 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
-					cutf::cp_async::cp_async<16>(&smem_ptr[i], &dmem_ptr[dmem_index]);
+					cutf::cp_async::cp_async<16>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
 				}
 			} else if ((ldd & 0x3) == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
@@ -95,8 +100,9 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
-					cutf::cp_async::cp_async<8>(&smem_ptr[i], &dmem_ptr[dmem_index]);
+					cutf::cp_async::cp_async<8>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
 				}
 			} else if ((ldd & 0x1) == 0) {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
@@ -104,8 +110,9 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
-					cutf::cp_async::cp_async<4>(&smem_ptr[i], &dmem_ptr[dmem_index]);
+					cutf::cp_async::cp_async<4>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
 				}
 			} else {
 				for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
@@ -113,8 +120,9 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
-					smem_ptr[i] = dmem_ptr[dmem_index];
+					smem_ptr[smem_index] = dmem_ptr[dmem_index];
 				}
 			}
 		} else {
@@ -123,13 +131,14 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 				const auto m = (i % SMEM_M) + dmem_start_m;
 				const auto n = (i / SMEM_M) + dmem_start_n;
 				const auto dmem_index = m + n * ldd;
+				const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
 				auto v = cutf::type::cast<half>(0);
 				if (m < dmem_size_m && n < dmem_size_n) {
 					v = dmem_ptr[dmem_index];
 				}
 
-				smem_ptr[i] = v;
+				smem_ptr[smem_index] = v;
 			}
 		}
 		cutf::cp_async::commit();
