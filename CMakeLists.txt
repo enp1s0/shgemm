@@ -55,17 +55,19 @@ if (${BUILD_SHGEMM_TEST})
 	# Directory
 	set(TESTSRCDIR test)
 
-	foreach(test shgemm exponent)
+	foreach(test shgemm exponent power_consumption)
 		set(test_out ${test}.test)
 		add_executable(${test_out} ${TESTSRCDIR}/${test}_test.cu ${HEADERS})
 		target_include_directories(${test_out} PRIVATE ${INCDIR})
-		target_include_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/include)
-		target_link_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/build)
+		target_include_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/include ${TESTSRCDIR}/gpu_monitor/include)
+		target_link_directories(${test_out} PRIVATE ${TESTSRCDIR}/mateval/build ${TESTSRCDIR}/gpu_monitor/build)
 		target_link_libraries(${test_out} PRIVATE mateval_cuda)
+		target_link_libraries(${test_out} PRIVATE gpu_monitor)
 		target_link_libraries(${test_out} PRIVATE shgemm)
 		target_link_libraries(${test_out} PRIVATE
 			CUDA::cublas
 			CUDA::curand
+			nvidia-ml
 			)
 	endforeach()
 endif()
