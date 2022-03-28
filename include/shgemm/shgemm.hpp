@@ -71,7 +71,7 @@ void set_debug_mode(shgemmHandle_t& handle, const unsigned on);
 void set_cuda_stream(shgemmHandle_t& handle, cudaStream_t const cuda_stream);
 
 // main function
-void shgemm(
+mtk::shgemm::detail::kernel_level shgemm(
 		const shgemmHandle_t handle,
 		const operation_t op_a,
 		const operation_t op_b,

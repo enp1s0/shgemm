@@ -440,8 +440,8 @@ void mtk::shgemm::create(
 		=====================================*/
 	{
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 32, SMEM_N = 32, SMEM_K = 128;
-		constexpr unsigned FRAG_M = 16, FRAG_N = 16, FRAG_K = 32;
+		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 128;
+		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 128;
 		using TC_T = half;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -608,7 +608,7 @@ void mtk::shgemm::disable_kernel_level_fixing(
 	handle.fixed_lernel_level = mtk::shgemm::detail::num_levels;
 }
 
-void mtk::shgemm::shgemm(
+mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		const mtk::shgemm::shgemmHandle_t handle,
 		const mtk::shgemm::operation_t op_a,
 		const mtk::shgemm::operation_t op_b,
@@ -655,7 +655,7 @@ void mtk::shgemm::shgemm(
 		for (; kernel_level > 0; kernel_level--) {
 			const auto kernel = kernel_list[kernel_level];
 			const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
-			if (num_blocks >= kernel.num_blocks_filling * 4) {
+			if (num_blocks >= kernel.num_blocks_filling * 2) {
 				break;
 			}
 		}
@@ -687,6 +687,8 @@ void mtk::shgemm::shgemm(
 		 *beta_ptr,
 		 c_ptr, ldc
 		 );
+
+	return static_cast<mtk::shgemm::detail::kernel_level>(kernel_level);
 }
 
 void mtk::shgemm::set_debug_mode(mtk::shgemm::shgemmHandle_t& handle, const unsigned on) {
