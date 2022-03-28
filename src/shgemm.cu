@@ -270,7 +270,7 @@ void set_kernel(
 	CUTF_CHECK_ERROR(cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
 
 	kernel.func = func;
-	kernel.num_blocks_filling = max_block_per_ms * num_sm;
+	kernel.num_blocks_filling = std::max(1, max_block_per_ms) * num_sm;
 	kernel.smem_m = SMEM_M;
 	kernel.smem_n = SMEM_N;
 	kernel.block_size = BLOCK_SIZE;
@@ -292,16 +292,31 @@ void mtk::shgemm::create(
 		=====================================*/
 	{
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 128;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
+		constexpr unsigned SMEM_M = 32, SMEM_N = 32, SMEM_K = 128;
+		constexpr unsigned FRAG_M = 16, FRAG_N = 16, FRAG_K = 128;
 		using TC_T = nvcuda::wmma::precision::tf32;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
 		constexpr auto OP_B = mtk::shgemm::op_n;
 
-		auto& kernel = handle.tf32_nn_kernel[0];
+		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P0];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	{
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 32;
+		using TC_T = nvcuda::wmma::precision::tf32;
+
+		constexpr auto OP_A = mtk::shgemm::op_n;
+		constexpr auto OP_B = mtk::shgemm::op_n;
+
+		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P1];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, 1>(
 				kernel, num_sm
 				);
 	}
@@ -314,7 +329,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_n;
 		constexpr auto OP_B = mtk::shgemm::op_n;
 
-		auto& kernel = handle.tf32_nn_kernel[1];
+		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P2];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, 1>(
 				kernel, num_sm
@@ -332,7 +347,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_n;
 		constexpr auto OP_B = mtk::shgemm::op_t;
 
-		auto& kernel = handle.tf32_nt_kernel[0];
+		auto& kernel = handle.tf32_nt_kernel[mtk::shgemm::detail::P0];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -347,7 +362,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_n;
 		constexpr auto OP_B = mtk::shgemm::op_t;
 
-		auto& kernel = handle.tf32_nt_kernel[1];
+		auto& kernel = handle.tf32_nt_kernel[mtk::shgemm::detail::P1];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -365,7 +380,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_t;
 		constexpr auto OP_B = mtk::shgemm::op_n;
 
-		auto& kernel = handle.tf32_tn_kernel[0];
+		auto& kernel = handle.tf32_tn_kernel[mtk::shgemm::detail::P0];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -380,7 +395,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_t;
 		constexpr auto OP_B = mtk::shgemm::op_n;
 
-		auto& kernel = handle.tf32_tn_kernel[1];
+		auto& kernel = handle.tf32_tn_kernel[mtk::shgemm::detail::P1];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -398,7 +413,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_t;
 		constexpr auto OP_B = mtk::shgemm::op_t;
 
-		auto& kernel = handle.tf32_tt_kernel[0];
+		auto& kernel = handle.tf32_tt_kernel[mtk::shgemm::detail::P0];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -413,7 +428,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_t;
 		constexpr auto OP_B = mtk::shgemm::op_t;
 
-		auto& kernel = handle.tf32_tt_kernel[1];
+		auto& kernel = handle.tf32_tt_kernel[mtk::shgemm::detail::P1];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -424,15 +439,30 @@ void mtk::shgemm::create(
 		FP16-NN
 		=====================================*/
 	{
-		constexpr unsigned BLOCK_SIZE = 256;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 128;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 32;
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 128;
+		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 128;
 		using TC_T = half;
 
 		constexpr auto OP_A = mtk::shgemm::op_n;
 		constexpr auto OP_B = mtk::shgemm::op_n;
 
-		auto& kernel = handle.fp16_nn_kernel[0];
+		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P0];
+
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
+				kernel, num_sm
+				);
+	}
+	{
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 128;
+		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 128;
+		using TC_T = half;
+
+		constexpr auto OP_A = mtk::shgemm::op_n;
+		constexpr auto OP_B = mtk::shgemm::op_n;
+
+		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P1];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -447,7 +477,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_n;
 		constexpr auto OP_B = mtk::shgemm::op_n;
 
-		auto& kernel = handle.fp16_nn_kernel[1];
+		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P2];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -465,7 +495,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_n;
 		constexpr auto OP_B = mtk::shgemm::op_t;
 
-		auto& kernel = handle.fp16_nt_kernel[0];
+		auto& kernel = handle.fp16_nt_kernel[mtk::shgemm::detail::P0];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -480,7 +510,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_n;
 		constexpr auto OP_B = mtk::shgemm::op_t;
 
-		auto& kernel = handle.fp16_nt_kernel[1];
+		auto& kernel = handle.fp16_nt_kernel[mtk::shgemm::detail::P1];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -498,7 +528,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_t;
 		constexpr auto OP_B = mtk::shgemm::op_n;
 
-		auto& kernel = handle.fp16_tn_kernel[0];
+		auto& kernel = handle.fp16_tn_kernel[mtk::shgemm::detail::P0];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -513,7 +543,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_t;
 		constexpr auto OP_B = mtk::shgemm::op_n;
 
-		auto& kernel = handle.fp16_tn_kernel[1];
+		auto& kernel = handle.fp16_tn_kernel[mtk::shgemm::detail::P1];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -531,7 +561,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_t;
 		constexpr auto OP_B = mtk::shgemm::op_t;
 
-		auto& kernel = handle.fp16_tt_kernel[0];
+		auto& kernel = handle.fp16_tt_kernel[mtk::shgemm::detail::P0];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -546,7 +576,7 @@ void mtk::shgemm::create(
 		constexpr auto OP_A = mtk::shgemm::op_t;
 		constexpr auto OP_B = mtk::shgemm::op_t;
 
-		auto& kernel = handle.fp16_tt_kernel[1];
+		auto& kernel = handle.fp16_tt_kernel[mtk::shgemm::detail::P1];
 
 		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B>(
 				kernel, num_sm
@@ -578,7 +608,7 @@ void mtk::shgemm::disable_kernel_level_fixing(
 	handle.fixed_lernel_level = mtk::shgemm::detail::num_levels;
 }
 
-void mtk::shgemm::shgemm(
+mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		const mtk::shgemm::shgemmHandle_t handle,
 		const mtk::shgemm::operation_t op_a,
 		const mtk::shgemm::operation_t op_b,
@@ -625,7 +655,7 @@ void mtk::shgemm::shgemm(
 		for (; kernel_level > 0; kernel_level--) {
 			const auto kernel = kernel_list[kernel_level];
 			const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
-			if (num_blocks >= kernel.num_blocks_filling) {
+			if (num_blocks >= kernel.num_blocks_filling * 2) {
 				break;
 			}
 		}
@@ -657,6 +687,8 @@ void mtk::shgemm::shgemm(
 		 *beta_ptr,
 		 c_ptr, ldc
 		 );
+
+	return static_cast<mtk::shgemm::detail::kernel_level>(kernel_level);
 }
 
 void mtk::shgemm::set_debug_mode(mtk::shgemm::shgemmHandle_t& handle, const unsigned on) {

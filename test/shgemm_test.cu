@@ -46,7 +46,7 @@ void test_shgemm_core(
 		const mtk::shgemm::tc_t compute_type
 		) {
 	const float alpha = 1.0f, beta = 0.0f;
-	mtk::shgemm::shgemm(
+	const auto level = mtk::shgemm::shgemm(
 			shgemm_handle,
 			op_a, op_b,
 			m, n, k,
@@ -91,14 +91,15 @@ void test_shgemm_core(
 
 	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
 
-	std::printf("%s,%lu,%lu,%lu,%s,%s,%e,%e,%e\n",
+	std::printf("%s,%lu,%lu,%lu,%s,%s,%e,%e,%e,%u\n",
 			(compute_type == mtk::shgemm::fp16 ? "fp16" : "tf32"),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
 			error.at(mtk::mateval::max_relative_error),
 			error.at(mtk::mateval::relative_residual),
-			throughput
+			throughput,
+			static_cast<unsigned>(level)
 			);
 	std::fflush(stdout);
 }
@@ -147,7 +148,7 @@ int main() {
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
 
-	std::printf("tc_t,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops\n");
+	std::printf("tc_t,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops,kernel_level\n");
 	std::fflush(stdout);
 	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
 		for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {

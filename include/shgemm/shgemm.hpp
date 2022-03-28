@@ -19,7 +19,7 @@ typedef void (*kernel_func_t)(
 
 struct kernel {
 	unsigned smem_m, smem_n;
-	unsigned num_blocks_filling;
+	unsigned num_blocks_filling = 0xffffffffu;
 	unsigned block_size;
 	unsigned smem_size;
 
@@ -27,8 +27,9 @@ struct kernel {
 };
 
 enum kernel_level {
-	P0 = 0, // small
-	P1 = 1, // Large
+	P0 = 0, // Small
+	P1 = 1, // Medium
+	P2 = 2, // Large
 	num_levels
 };
 }
@@ -70,7 +71,7 @@ void set_debug_mode(shgemmHandle_t& handle, const unsigned on);
 void set_cuda_stream(shgemmHandle_t& handle, cudaStream_t const cuda_stream);
 
 // main function
-void shgemm(
+mtk::shgemm::detail::kernel_level shgemm(
 		const shgemmHandle_t handle,
 		const operation_t op_a,
 		const operation_t op_b,
