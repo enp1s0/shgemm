@@ -19,7 +19,7 @@ typedef void (*kernel_func_t)(
 
 struct kernel {
 	unsigned smem_m, smem_n;
-	unsigned num_blocks_filling;
+	unsigned num_blocks_filling = 0;
 	unsigned block_size;
 	unsigned smem_size;
 
@@ -27,8 +27,9 @@ struct kernel {
 };
 
 enum kernel_level {
-	P0 = 0, // small
-	P1 = 1, // Large
+	P0 = 0, // Small
+	P1 = 1, // Medium
+	P2 = 2, // Large
 	num_levels
 };
 }
