@@ -7,3 +7,6 @@
 [submodule "test/mateval"]
 	path = test/mateval
 	url = https://github.com/enp1s0/mateval
+[submodule "test/gpu_monitor"]
+	path = test/gpu_monitor
+	url = https://github.com/enp1s0/gpu_monitor
