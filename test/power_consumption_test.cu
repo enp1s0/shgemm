@@ -7,9 +7,9 @@
 #include <gpu_monitor/gpu_monitor.hpp>
 #include <shgemm/shgemm.hpp>
 
-constexpr std::size_t min_log_DIM = 5;
-constexpr std::size_t max_log_DIM = 13;
-constexpr std::size_t log_DIM_interval = 3;
+constexpr std::size_t min_log_DIM = 10;
+constexpr std::size_t max_log_DIM = 14;
+constexpr std::size_t log_DIM_interval = 1;
 constexpr auto compute_type = mtk::shgemm::tf32;
 constexpr auto op_a = mtk::shgemm::op_n;
 constexpr auto op_b = mtk::shgemm::op_n;
@@ -45,12 +45,32 @@ void test_shgemm_core(
 		const std::size_t k,
 		const mtk::shgemm::tc_t compute_type
 		) {
-	const std::size_t approx_tflops = 20;
-	const std::size_t measuring_time_in_sec = 10;
-	const std::size_t test_count = (approx_tflops * 1000000000000lu) * measuring_time_in_sec / (2 * m * n * k);
-
 	const float alpha = 1.0f, beta = 0.0f;
+	const std::size_t measuring_time_in_sec = 10;
 	mtk::shgemm::detail::kernel_level level;
+
+	const std::size_t test_count_0 = 16;
+	const auto start_clock = std::chrono::system_clock::now();
+	for (std::size_t test_c = 0; test_c < test_count_0; test_c++) {
+		mtk::shgemm::shgemm(
+				shgemm_handle,
+				op_a, op_b,
+				m, n, k,
+				&alpha,
+				a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+				b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
+				&beta,
+				c_fp32_ptr, m,
+				compute_type
+				);
+	}
+	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
+	const auto end_clock = std::chrono::system_clock::now();
+	const auto elapsed_time_0 = std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() * 1e-6 / test_count_0;
+	const auto throughput_in_tflops = 2 * m * n * k / elapsed_time_0 * 1e-12;
+
+	const std::size_t test_count = std::max<std::size_t>(1, measuring_time_in_sec / elapsed_time_0);
+
 	const auto profiling_result = mtk::gpu_monitor::measure_power_consumption([&](){
 			CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 			for (std::size_t test_c = 0; test_c < test_count; test_c++) {
@@ -71,12 +91,15 @@ void test_shgemm_core(
 	const auto elapsed_time = mtk::gpu_monitor::get_elapsed_time(profiling_result);
 	const auto integrated_power_consumption = mtk::gpu_monitor::get_integrated_power_consumption(profiling_result);
 
-	std::printf("%s,%lu,%lu,%lu,%s,%s,%e,%u\n",
+	std::printf("%s,%lu,%lu,%lu,%s,%s,%e,%e,%e,%lu,%u\n",
 			(compute_type == mtk::shgemm::fp16 ? "fp16" : "tf32"),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
-			integrated_power_consumption / elapsed_time / test_count,
+			throughput_in_tflops,
+			integrated_power_consumption / elapsed_time,
+			integrated_power_consumption / test_count,
+			test_count,
 			static_cast<unsigned>(level)
 			);
 	std::fflush(stdout);
@@ -126,7 +149,7 @@ int main() {
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
 
-	std::printf("tc_t,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops,kernel_level\n");
+	std::printf("tc_t,m,n,k,op_a,op_b,,throughput_in_tflops,avg_power_consumption_in_W,integrated_power_consumption_in_Ws,test_count,kernel_level\n");
 	std::fflush(stdout);
 	for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
 		const auto m = 1lu << log_N;
