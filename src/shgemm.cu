@@ -270,7 +270,7 @@ void set_kernel(
 	CUTF_CHECK_ERROR(cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
 
 	kernel.func = func;
-	kernel.num_blocks_filling = max_block_per_ms * num_sm;
+	kernel.num_blocks_filling = std::max(1, max_block_per_ms) * num_sm;
 	kernel.smem_m = SMEM_M;
 	kernel.smem_n = SMEM_N;
 	kernel.block_size = BLOCK_SIZE;
@@ -655,7 +655,7 @@ void mtk::shgemm::shgemm(
 		for (; kernel_level > 0; kernel_level--) {
 			const auto kernel = kernel_list[kernel_level];
 			const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
-			if (num_blocks >= kernel.num_blocks_filling) {
+			if (num_blocks >= kernel.num_blocks_filling * 4) {
 				break;
 			}
 		}
