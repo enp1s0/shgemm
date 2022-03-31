@@ -87,7 +87,7 @@ __global__ void shgemm_kernel(
 	// Store smem C to dmem
 	__syncthreads();
 	C_DMEM_STORER c_dmem_storer;
-	if (beta == 0.0f && num_k_slices == 1) {
+	if (beta == 0.0f || num_k_slices == 1) {
 		c_dmem_storer(c_ptr, ldc,
 				blockIdx.y * SMEM_M, blockIdx.x * SMEM_N,
 				m, n,
@@ -301,15 +301,15 @@ void set_kernel(
 	mtk::shgemm::detail::kernel_func_t func;
 	if constexpr (USE_ATOMIC_STORER) {
 		if constexpr (USE_PIPELINE_CORE) {
-			func = pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
-		} else {
-			func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
-		}
-	} else {
-		if constexpr (USE_PIPELINE_CORE) {
 			func = atomic_pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
 		} else {
 			func = atomic_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+		}
+	} else {
+		if constexpr (USE_PIPELINE_CORE) {
+			func = pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+		} else {
+			func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
 		}
 	}
 	const unsigned smem_size = get_shared_memory_size_in_byte<SMEM_M, SMEM_N, SMEM_K, NUM_STAGES, typename op_t2layout<op_a>::type, typename op_t2layout<op_b>::type>();
@@ -599,7 +599,7 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 			 b_ptr, ldb,
 			 *beta_ptr,
 			 c_ptr, ldc,
-			 handle.w_ptr, 1
+			 nullptr, 1
 			);
 		return static_cast<mtk::shgemm::detail::kernel_level>(kernel_level);
 	}
