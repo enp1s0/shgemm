@@ -29,8 +29,7 @@ struct kernel {
 
 enum kernel_level {
 	P0 = 0, // Small
-	P1 = 1, // Medium
-	P2 = 2, // Large
+	P1 = 1, // Large
 	num_levels
 };
 }

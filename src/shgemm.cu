@@ -490,7 +490,7 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		) {
 	if (m * n <= handle.max_working_memory_num_elements && k >= 2048) {
 		mtk::shgemm::detail::kernel kernel;
-		if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
+		if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
 			if (compute_type == mtk::shgemm::fp16) {
 				kernel = handle.fp16_nn_k_slicing_kernel;
 			} else if (compute_type == mtk::shgemm::tf32) {
