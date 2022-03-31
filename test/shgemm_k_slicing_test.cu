@@ -7,9 +7,9 @@
 #include <shgemm/shgemm.hpp>
 
 constexpr std::size_t test_count = 1lu << 6;
-constexpr std::size_t matrix_N = 128;
+constexpr std::size_t matrix_N = 1lu << 7;
 constexpr std::size_t min_log_DIM = 11;
-constexpr std::size_t max_log_DIM = 20;
+constexpr std::size_t max_log_DIM = 22;
 constexpr std::size_t log_DIM_interval = 1;
 constexpr auto compute_type = mtk::shgemm::tf32;
 constexpr auto op_a = mtk::shgemm::op_n;
@@ -52,10 +52,10 @@ void test_shgemm_core(
 			op_a, op_b,
 			m, n, k,
 			&alpha,
-			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k) * 2,
-			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n) * 2,
+			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 			&beta,
-			c_fp32_ptr, m * 2,
+			c_fp32_ptr, m,
 			compute_type
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
@@ -66,9 +66,9 @@ void test_shgemm_core(
 			convert_op_shgemm2mateval(op_a),
 			convert_op_shgemm2mateval(op_b),
 			mtk::mateval::col_major,
-			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k) * 2,
-			b_fp32_ptr, (op_b == mtk::shgemm::op_n ? k : n) * 2,
-			c_fp32_ptr, m * 2
+			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+			b_fp32_ptr, (op_b == mtk::shgemm::op_n ? k : n),
+			c_fp32_ptr, m
 			);
 
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
@@ -79,10 +79,10 @@ void test_shgemm_core(
 				op_a, op_b,
 				m, n, k,
 				&alpha,
-				a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k) * 2,
-				b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n) * 2,
+				a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
+				b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 				&beta,
-				c_fp32_ptr, m * 2,
+				c_fp32_ptr, m,
 				compute_type
 				);
 	}
@@ -135,16 +135,16 @@ int main() {
 	const auto max_K = 1lu << max_log_DIM;
 	auto a_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_K * matrix_N);
 	auto b_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(max_K * matrix_N);
-	auto b_fp16_uptr = cutf::memory::get_device_unique_ptr<half >(matrix_N * matrix_N);
+	auto b_fp16_uptr = cutf::memory::get_device_unique_ptr<half >(max_K * matrix_N);
 	auto c_fp32_uptr = cutf::memory::get_device_unique_ptr<float>(matrix_N * matrix_N);
 
 	const auto seed = 10lu;
 	auto cugen = cutf::curand::get_curand_unique_ptr(CURAND_RNG_PSEUDO_PHILOX4_32_10);
 	CUTF_CHECK_ERROR(curandSetPseudoRandomGeneratorSeed(*cugen.get(), seed));
 
-	CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), a_fp32_uptr.get(), matrix_N * max_K));
-	CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), b_fp32_uptr.get(), matrix_N * max_K));
-	convert_B_to_fp16(b_fp16_uptr.get(), b_fp32_uptr.get(), matrix_N * max_K);
+	CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), a_fp32_uptr.get(), max_K * matrix_N));
+	CUTF_CHECK_ERROR(cutf::curand::generate_uniform(*cugen.get(), b_fp32_uptr.get(), max_K * matrix_N));
+	convert_B_to_fp16(b_fp16_uptr.get(), b_fp32_uptr.get(), max_K * matrix_N);
 
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
