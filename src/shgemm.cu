@@ -94,7 +94,7 @@ __global__ void shgemm_kernel(
 				c_smem_ptr,
 				alpha, beta);
 	} else {
-		c_dmem_storer(w_ptr, m,
+		c_dmem_storer(w_ptr, (beta == 0.0f ? ldc : m),
 				blockIdx.y * SMEM_M, blockIdx.x * SMEM_N,
 				m, n,
 				c_smem_ptr,
@@ -112,7 +112,9 @@ __global__ void init_working_memory_kernel(
 	if (tid >= m * n) {
 		return;
 	}
-	w_ptr[m + n * ld] = 0.f;
+	const auto im = tid % m;
+	const auto in = tid / n;
+	w_ptr[im + in * ld] = 0.f;
 }
 
 void init_working_memory(
@@ -329,6 +331,7 @@ void set_kernel(
 	kernel.num_blocks_filling = std::max(1, max_block_per_ms) * num_sm;
 	kernel.smem_m = SMEM_M;
 	kernel.smem_n = SMEM_N;
+	kernel.smem_k = SMEM_K;
 	kernel.block_size = BLOCK_SIZE;
 	kernel.smem_size = smem_size;
 }
@@ -515,8 +518,8 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		}
 
 		const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
-		unsigned num_k_slices = 2;
-		for (;num_k_slices <= 128; num_k_slices <<= 1) {
+		unsigned num_k_slices = 1;
+		for (;num_k_slices <= k / kernel.smem_k; num_k_slices <<= 1) {
 			if (num_blocks * num_k_slices >= kernel.num_blocks_filling * 2) {
 				break;
 			}

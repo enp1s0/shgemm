@@ -19,7 +19,7 @@ typedef void (*kernel_func_t)(
 			);
 
 struct kernel {
-	unsigned smem_m, smem_n;
+	unsigned smem_m, smem_n, smem_k;
 	unsigned num_blocks_filling = 0xffffffffu;
 	unsigned block_size;
 	unsigned smem_size;
