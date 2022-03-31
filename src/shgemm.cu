@@ -113,7 +113,7 @@ __global__ void init_working_memory_kernel(
 		return;
 	}
 	const auto im = tid % m;
-	const auto in = tid / n;
+	const auto in = tid / m;
 	w_ptr[im + in * ld] = 0.f;
 }
 
