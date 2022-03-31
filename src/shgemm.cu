@@ -284,6 +284,15 @@ void mtk::shgemm::create(
 	handle.cuda_stream = 0;
 	handle.fixed_lernel_level = detail::num_levels;
 
+	const auto debug_env = getenv("MTK_SHGEMM_DEBUG");
+	if (debug_env != nullptr && debug_env[0] == '1') {
+		handle.debug_mode = 1;
+	}
+	const auto kernel_level_env = getenv("MTK_SHGEMM_KERNEL_LEVEL");
+	if (kernel_level_env != nullptr && (kernel_level_env[0] == '0' || kernel_level_env[0] == '1') && kernel_level_env[1] == '\0') {
+		handle.fixed_lernel_level = static_cast<mtk::shgemm::detail::kernel_level>(std::stoul(kernel_level_env));
+	}
+
 	cudaDeviceProp prop;
 	cudaGetDeviceProperties(&prop, 0);
 	const unsigned num_sm = prop.multiProcessorCount;
