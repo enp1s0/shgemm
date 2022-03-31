@@ -397,8 +397,8 @@ void mtk::shgemm::create(
 	}
 	{
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 32, SMEM_N = 32, SMEM_K = 128;
-		constexpr unsigned FRAG_M = 16, FRAG_N = 16, FRAG_K = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
@@ -451,8 +451,8 @@ void mtk::shgemm::create(
 	}
 	{
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 128;
-		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
 
 		using TC_T = half;
@@ -507,7 +507,7 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		float* const c_ptr, const std::size_t ldc,
 		const tc_t compute_type
 		) {
-	if (m * n <= handle.max_working_memory_num_elements && k >= 2048) {
+	if (m * n <= handle.max_working_memory_num_elements && k >= 4096 && *beta_ptr == 0.f) {
 		mtk::shgemm::detail::kernel kernel;
 		if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
 			if (compute_type == mtk::shgemm::fp16) {
@@ -520,7 +520,7 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
 		unsigned num_k_slices = 1;
 		for (;num_k_slices <= k / kernel.smem_k; num_k_slices <<= 1) {
-			if (num_blocks * num_k_slices >= kernel.num_blocks_filling * 2) {
+			if (num_blocks * num_k_slices >= kernel.num_blocks_filling * (2048 / kernel.smem_k)) {
 				break;
 			}
 		}
