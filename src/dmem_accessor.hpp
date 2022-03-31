@@ -306,6 +306,33 @@ struct dmem_storer_n {
 		}
 	}
 };
+
+// -----------------------------------------
+// N - atomic storer
+// -----------------------------------------
+template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct dmem_atomic_storer_n {
+	__device__ void operator()(
+			T* const dmem_ptr, const std::size_t ldd,
+			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
+			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const T* const smem_ptr,
+			const float alpha, const float beta
+			) {
+		for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE) {
+			const auto i = i_offset + threadIdx.x;
+			const auto m = (i % SMEM_M) + dmem_start_m;
+			const auto n = (i / SMEM_M) + dmem_start_n;
+			const auto dmem_index = m + n * ldd;
+
+			if (m >= dmem_size_m || n >= dmem_size_n) {
+				continue;
+			}
+
+			atomicAdd(&dmem_ptr[dmem_index], smem_ptr[i] * alpha);
+		}
+	}
+};
 } // namespace device
 } // namespace shgemm
 } // namespace mtk
