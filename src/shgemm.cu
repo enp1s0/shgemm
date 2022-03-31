@@ -94,7 +94,7 @@ __global__ void shgemm_kernel(
 				c_smem_ptr,
 				alpha, beta);
 	} else {
-		c_dmem_storer(w_ptr, ldc,
+		c_dmem_storer(w_ptr, m,
 				blockIdx.y * SMEM_M, blockIdx.x * SMEM_N,
 				m, n,
 				c_smem_ptr,
