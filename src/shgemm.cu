@@ -104,20 +104,26 @@ __global__ void shgemm_kernel(
 
 __global__ void init_working_memory_kernel(
 		float* const w_ptr,
-		const std::size_t size
+		const unsigned m,
+		const unsigned n,
+		const std::size_t ld
 		) {
 	const auto tid = blockIdx.x * blockDim.x + threadIdx.x;
-	if (tid >= size) {
-		w_ptr[tid] = 0.f;
+	if (tid >= m * n) {
+		return;
 	}
+	w_ptr[m + n * ld] = 0.f;
 }
 
 void init_working_memory(
 		float* const w_ptr,
-		const std::size_t size,
+		const unsigned m,
+		const unsigned n,
+		const std::size_t ld,
 		cudaStream_t cuda_stream) {
 	const std::size_t block_size = 256;
-	init_working_memory_kernel<<<(size + block_size - 1) / block_size, block_size, 0, cuda_stream>>>(w_ptr, size);
+	const std::size_t size = m * n;
+	init_working_memory_kernel<<<(size + block_size - 1) / block_size, block_size, 0, cuda_stream>>>(w_ptr, m, n, ld);
 }
 
 
@@ -509,7 +515,7 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		}
 
 		const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
-		unsigned num_k_slices = 1;
+		unsigned num_k_slices = 2;
 		for (;num_k_slices <= 128; num_k_slices <<= 1) {
 			if (num_blocks * num_k_slices >= kernel.num_blocks_filling * 2) {
 				break;
@@ -517,12 +523,15 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		}
 
 		float* w_ptr;
+		std::size_t ldw;
 		if (*beta_ptr == 0.0f) {
 			w_ptr = c_ptr;
+			ldw = ldc;
 		} else {
 			w_ptr = handle.w_ptr;
+			ldw = m;
 		}
-		init_working_memory(w_ptr, m * n, handle.cuda_stream);
+		init_working_memory(w_ptr, m, n, ldw, handle.cuda_stream);
 
 		if (handle.debug_mode) {
 			std::printf("[shape=(%lu,%lu,%lu),op_a=%s,op_b=%s,compute_type=%s] kernel_ptr = %p, num_l_slicing = %u\n",
