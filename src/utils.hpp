@@ -33,6 +33,13 @@ template <unsigned SMEM_K, unsigned SMEM_N>
 struct get_B_smem_size<SMEM_K, SMEM_N, mtk::shgemm::utils::row_major> {const static unsigned value = (SMEM_N + mtk::shgemm::device::B_smem_skew) * SMEM_K;};
 template <unsigned SMEM_K, unsigned SMEM_N>
 struct get_B_smem_size<SMEM_K, SMEM_N, mtk::shgemm::utils::col_major> {const static unsigned value = (SMEM_K + mtk::shgemm::device::B_smem_skew) * SMEM_N;};
+
+template <class LAYOUT>
+struct get_mem_index {__device__ std::size_t operator()(const unsigned m, const unsigned n, const unsigned ld);};
+template <>
+struct get_mem_index<mtk::shgemm::utils::col_major> {__device__ std::size_t operator()(const unsigned m, const unsigned n, const unsigned ld) {return m + n * static_cast<std::size_t>(ld);};};
+template <>
+struct get_mem_index<mtk::shgemm::utils::row_major> {__device__ std::size_t operator()(const unsigned m, const unsigned n, const unsigned ld) {return m * static_cast<std::size_t>(ld) + n;};};
 } // namespace device
 } // namespace shgemm
 } // namespace mtk

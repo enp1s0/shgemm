@@ -55,7 +55,7 @@ if (${BUILD_SHGEMM_TEST})
 	# Directory
 	set(TESTSRCDIR test)
 
-	foreach(test shgemm exponent power_consumption)
+	foreach(test shgemm shgemm_k_slicing exponent power_consumption)
 		set(test_out ${test}.test)
 		add_executable(${test_out} ${TESTSRCDIR}/${test}_test.cu ${HEADERS})
 		target_include_directories(${test_out} PRIVATE ${INCDIR})

@@ -14,11 +14,12 @@ typedef void (*kernel_func_t)(
 			const float* const, const std::size_t,
 			const half * const, const std::size_t,
 			const float,
-			float* const , const std::size_t
+			float* const, const std::size_t,
+			float* const, const unsigned
 			);
 
 struct kernel {
-	unsigned smem_m, smem_n;
+	unsigned smem_m, smem_n, smem_k;
 	unsigned num_blocks_filling = 0xffffffffu;
 	unsigned block_size;
 	unsigned smem_size;
@@ -28,8 +29,7 @@ struct kernel {
 
 enum kernel_level {
 	P0 = 0, // Small
-	P1 = 1, // Medium
-	P2 = 2, // Large
+	P1 = 1, // Large
 	num_levels
 };
 }
@@ -47,17 +47,23 @@ struct shgemmHandle_t {
 	cudaStream_t cuda_stream;
 
 	detail::kernel fp16_nn_kernel[detail::num_levels];
-	detail::kernel fp16_tn_kernel[detail::num_levels];
-	detail::kernel fp16_nt_kernel[detail::num_levels];
-	detail::kernel fp16_tt_kernel[detail::num_levels];
 	detail::kernel tf32_nn_kernel[detail::num_levels];
-	detail::kernel tf32_tn_kernel[detail::num_levels];
-	detail::kernel tf32_nt_kernel[detail::num_levels];
-	detail::kernel tf32_tt_kernel[detail::num_levels];
+	detail::kernel fp16_nn_k_slicing_kernel;
+	detail::kernel tf32_nn_k_slicing_kernel;
+	//detail::kernel fp16_tn_kernel[detail::num_levels];
+	//detail::kernel fp16_nt_kernel[detail::num_levels];
+	//detail::kernel fp16_tt_kernel[detail::num_levels];
+	//detail::kernel tf32_nn_kernel[detail::num_levels];
+	//detail::kernel tf32_tn_kernel[detail::num_levels];
+	//detail::kernel tf32_nt_kernel[detail::num_levels];
+	//detail::kernel tf32_tt_kernel[detail::num_levels];
 
 	unsigned debug_mode = 0;
 
 	detail::kernel_level fixed_lernel_level;
+
+	const std::size_t max_working_memory_num_elements = 512 * 512;
+	float* w_ptr;
 };
 
 void create(shgemmHandle_t& handle);
