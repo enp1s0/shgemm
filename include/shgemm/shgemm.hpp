@@ -62,7 +62,7 @@ struct shgemmHandle_t {
 
 	detail::kernel_level fixed_lernel_level;
 
-	const std::size_t max_working_memory_num_elements = 512 * 512;
+	const std::size_t max_working_memory_num_elements = 64 * 64 * 108 * 2; // 1024 * 864
 	float* w_ptr;
 };
 
