@@ -201,9 +201,10 @@ struct dmem_storer_n {
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
 						const auto dmem_index = m + n * ldd;
+						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						// 128 bit memory access
-						auto v = *reinterpret_cast<const float4*>(&smem_ptr[i]);
+						auto v = *reinterpret_cast<const float4*>(&smem_ptr[smem_index]);
 						v.x *= alpha;
 						v.y *= alpha;
 						v.z *= alpha;
@@ -216,9 +217,10 @@ struct dmem_storer_n {
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
 						const auto dmem_index = m + n * ldd;
+						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						// 64 bit memory access
-						auto v = *reinterpret_cast<const float2*>(&smem_ptr[i]);
+						auto v = *reinterpret_cast<const float2*>(&smem_ptr[smem_index]);
 						v.x *= alpha;
 						v.y *= alpha;
 						*reinterpret_cast<float2*>(&dmem_ptr[dmem_index]) = v;
@@ -229,8 +231,9 @@ struct dmem_storer_n {
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
 						const auto dmem_index = m + n * ldd;
+						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
-						dmem_ptr[dmem_index] = smem_ptr[i] * alpha;
+						dmem_ptr[dmem_index] = smem_ptr[smem_index] * alpha;
 					}
 				}
 			} else {
@@ -239,12 +242,13 @@ struct dmem_storer_n {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 					if (m >= dmem_size_m || n >= dmem_size_n) {
 						continue;
 					}
 
-					dmem_ptr[dmem_index] = smem_ptr[i] * alpha;
+					dmem_ptr[dmem_index] = smem_ptr[smem_index] * alpha;
 				}
 			}
 		} else {
@@ -255,9 +259,10 @@ struct dmem_storer_n {
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
 						const auto dmem_index = m + n * ldd;
+						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						// 128 bit memory access
-						auto v = *reinterpret_cast<const float4*>(&smem_ptr[i]);
+						auto v = *reinterpret_cast<const float4*>(&smem_ptr[smem_index]);
 						const auto w = *reinterpret_cast<float4*>(&dmem_ptr[dmem_index]);
 						v.x = v.x * alpha + w.x * beta;
 						v.y = v.y * alpha + w.y * beta;
@@ -271,9 +276,10 @@ struct dmem_storer_n {
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
 						const auto dmem_index = m + n * ldd;
+						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						// 64 bit memory access
-						auto v = *reinterpret_cast<const float2*>(&smem_ptr[i]);
+						auto v = *reinterpret_cast<const float2*>(&smem_ptr[smem_index]);
 						const auto w = *reinterpret_cast<float2*>(&dmem_ptr[dmem_index]);
 						v.x = v.x * alpha + w.x * beta;
 						v.y = v.y * alpha + w.y * beta;
@@ -285,8 +291,9 @@ struct dmem_storer_n {
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
 						const auto dmem_index = m + n * ldd;
+						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
-						dmem_ptr[dmem_index] = smem_ptr[i] * alpha + dmem_ptr[dmem_index] + beta;
+						dmem_ptr[dmem_index] = smem_ptr[smem_index] * alpha + dmem_ptr[dmem_index] + beta;
 					}
 				}
 			} else {
@@ -295,12 +302,13 @@ struct dmem_storer_n {
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
 					const auto dmem_index = m + n * ldd;
+					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 					if (m >= dmem_size_m || n >= dmem_size_n) {
 						continue;
 					}
 
-					dmem_ptr[dmem_index] = smem_ptr[i] * alpha + dmem_ptr[dmem_index] * beta;
+					dmem_ptr[dmem_index] = smem_ptr[smem_index] * alpha + dmem_ptr[dmem_index] * beta;
 				}
 			}
 		}
