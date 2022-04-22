@@ -332,12 +332,13 @@ struct dmem_atomic_storer_n {
 			const auto m = (i % SMEM_M) + dmem_start_m;
 			const auto n = (i / SMEM_M) + dmem_start_n;
 			const auto dmem_index = m + n * ldd;
+			const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 			if (m >= dmem_size_m || n >= dmem_size_n) {
 				continue;
 			}
 
-			atomicAdd(&dmem_ptr[dmem_index], smem_ptr[i] * alpha);
+			atomicAdd(&dmem_ptr[dmem_index], smem_ptr[smem_index] * alpha);
 		}
 	}
 };
