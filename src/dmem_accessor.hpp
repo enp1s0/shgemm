@@ -195,7 +195,7 @@ struct dmem_storer_n {
 			) {
 		if (beta == 0.f) {
 			if (dmem_start_m + SMEM_M < dmem_size_m && dmem_start_n + SMEM_N < dmem_size_n) {
-				if (ldd & 0x3 == 0) {
+				if ((ldd & 0x3) == 0) {
 					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
 						const auto i = i_offset + threadIdx.x * 4;
 						const auto m = (i % SMEM_M) + dmem_start_m;
@@ -210,7 +210,7 @@ struct dmem_storer_n {
 						v.w *= alpha;
 						*reinterpret_cast<float4*>(&dmem_ptr[dmem_index]) = v;
 					}
-				} else if (ldd & 0x1 == 0) {
+				} else if ((ldd & 0x1) == 0) {
 					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
 						const auto i = i_offset + threadIdx.x * 2;
 						const auto m = (i % SMEM_M) + dmem_start_m;
@@ -249,7 +249,7 @@ struct dmem_storer_n {
 			}
 		} else {
 			if (dmem_start_m + SMEM_M < dmem_size_m && dmem_start_n + SMEM_N < dmem_size_n) {
-				if (ldd & 0x3 == 0) {
+				if ((ldd & 0x3) == 0) {
 					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 4) {
 						const auto i = i_offset + threadIdx.x * 4;
 						const auto m = (i % SMEM_M) + dmem_start_m;
@@ -265,7 +265,7 @@ struct dmem_storer_n {
 						v.w = v.w * alpha + w.w * beta;
 						*reinterpret_cast<float4*>(&dmem_ptr[dmem_index]) = v;
 					}
-				} else if (ldd & 0x1 == 0) {
+				} else if ((ldd & 0x1) == 0) {
 					for (unsigned i_offset = 0; i_offset < SMEM_M * SMEM_N; i_offset += BLOCK_SIZE * 2) {
 						const auto i = i_offset + threadIdx.x * 2;
 						const auto m = (i % SMEM_M) + dmem_start_m;
