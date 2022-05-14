@@ -81,7 +81,11 @@ __global__ void shgemm_kernel(
 		const unsigned matrix_id = matrix_id_offset + (threadIdx.x / mtk::shgemm::utils::warp_size);
 		const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
 		const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
-		mtk::wmma::tcec::store_matrix_sync(c_smem_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * SMEM_M, frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)], SMEM_M, nvcuda::wmma::mem_col_major);
+		mtk::wmma::tcec::store_matrix_sync(
+				c_smem_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * (SMEM_M + mtk::shgemm::device::C_smem_skew),
+				frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
+				SMEM_M + mtk::shgemm::device::C_smem_skew,
+				nvcuda::wmma::mem_col_major);
 	}
 
 	// Store smem C to dmem
@@ -139,7 +143,7 @@ unsigned get_shared_memory_size_in_byte(
 		) {
 	return std::max(NUM_STAGES * (mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, A_layout>::value) * size_of<float> +
 		NUM_STAGES * (mtk::shgemm::device::get_B_smem_size<SMEM_K, SMEM_N, B_layout>::value) * size_of<half>,
-		SMEM_M * SMEM_N * size_of<float>);
+		(SMEM_M + mtk::shgemm::device::C_smem_skew) * SMEM_N * size_of<float>);
 }
 
 template <mtk::shgemm::operation_t op, class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
