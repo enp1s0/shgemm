@@ -7,6 +7,16 @@ namespace mtk {
 namespace shgemm {
 namespace device {
 
+template <unsigned SMEM_M, unsigned SMEM_N>
+__device__ unsigned get_m_block_id(const unsigned m, const unsigned) {
+	return blockIdx.x % ((m + SMEM_M - 1) / SMEM_M);
+}
+
+template <unsigned SMEM_M, unsigned SMEM_N>
+__device__ unsigned get_n_block_id(const unsigned m, const unsigned) {
+	return blockIdx.x / ((m + SMEM_M - 1) / SMEM_M);
+}
+
 template <class LAYOUT, unsigned SMEM_M, unsigned SMEM_K, unsigned FRAG_M>
 __device__ unsigned calculate_mem_A_offset(const unsigned matrix_id_m, const unsigned k) {
 	if constexpr (std::is_same<LAYOUT, mtk::shgemm::utils::row_major>::value) {
