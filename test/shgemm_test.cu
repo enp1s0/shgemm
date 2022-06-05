@@ -8,7 +8,7 @@
 
 constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 5;
-constexpr std::size_t max_log_DIM = 13;
+constexpr std::size_t max_log_DIM = 14;
 constexpr std::size_t log_DIM_interval = 3;
 constexpr auto compute_type = mtk::shgemm::tf32;
 constexpr auto op_a = mtk::shgemm::op_n;
