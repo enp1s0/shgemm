@@ -24,9 +24,9 @@ template<
 	>
 struct shgemm_pipeline_core {
 	__device__ void operator() (
-			const std::size_t m,
-			const std::size_t n,
-			const std::size_t k,
+			const unsigned m,
+			const unsigned n,
+			const unsigned k,
 			const float* const a_gmem_ptr, const std::size_t lda,
 			const half * const b_gmem_ptr, const std::size_t ldb,
 			float* const a_smem_ptr,

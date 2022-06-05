@@ -16,8 +16,8 @@ template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_loader_n {
 	__device__ void operator()(
 			T* const smem_ptr,
-			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
-			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
 			const T* const dmem_ptr, const std::size_t ldd
 			) {
 		static_assert(SMEM_M * SMEM_N >= BLOCK_SIZE * 8, "SMEM_M * SMEM_N >= BLOCK_SIZE must be satisfied");
@@ -78,8 +78,8 @@ template <unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 	__device__ void operator()(
 			half* const smem_ptr,
-			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
-			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
 			const half* const dmem_ptr, const std::size_t ldd
 			) {
 		static_assert(SMEM_M * SMEM_N >= BLOCK_SIZE * 8, "SMEM_M * SMEM_N >= BLOCK_SIZE must be satisfied");
@@ -150,8 +150,8 @@ struct dmem_loader_row_major {
 	using layout = mtk::shgemm::utils::row_major;
 	__device__ void operator()(
 			T* const smem_ptr,
-			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
-			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
 			const T* const dmem_ptr, const std::size_t ldd
 			) {
 		dmem_loader_n<T, SMEM_N, SMEM_M, BLOCK_SIZE>{}(
@@ -168,8 +168,8 @@ struct dmem_loader_col_major {
 	using layout = mtk::shgemm::utils::col_major;
 	__device__ void operator()(
 			T* const smem_ptr,
-			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
-			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
 			const T* const dmem_ptr, const std::size_t ldd
 			) {
 		dmem_loader_n<T, SMEM_M, SMEM_N, BLOCK_SIZE>{}(
@@ -188,8 +188,8 @@ template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_storer_n {
 	__device__ void operator()(
 			T* const dmem_ptr, const std::size_t ldd,
-			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
-			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
 			const T* const smem_ptr,
 			const float alpha, const float beta
 			) {
@@ -322,8 +322,8 @@ template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_atomic_storer_n {
 	__device__ void operator()(
 			T* const dmem_ptr, const std::size_t ldd,
-			const std::size_t dmem_start_m, const std::size_t dmem_start_n,
-			const std::size_t dmem_size_m, const std::size_t dmem_size_n,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
 			const T* const smem_ptr,
 			const float alpha, const float beta
 			) {
