@@ -24,9 +24,9 @@ template<
 	>
 struct shgemm_pipeline_core {
 	__device__ void operator() (
-			const std::size_t m,
-			const std::size_t n,
-			const std::size_t k,
+			const unsigned m,
+			const unsigned n,
+			const unsigned k,
 			const float* const a_gmem_ptr, const std::size_t lda,
 			const half * const b_gmem_ptr, const std::size_t ldb,
 			float* const a_smem_ptr,
@@ -59,9 +59,9 @@ struct shgemm_pipeline_core<
 	TC_T
 	> {
 	__device__ void operator() (
-			const std::size_t m,
-			const std::size_t n,
-			const std::size_t k,
+			const unsigned m,
+			const unsigned n,
+			const unsigned k,
 			const float* const a_dmem_ptr, const std::size_t lda,
 			const half * const b_dmem_ptr, const std::size_t ldb,
 			float* const a_smem_ptr,
@@ -77,12 +77,12 @@ struct shgemm_pipeline_core<
 
 	std::size_t block_k = 0;
 	a_dram_loader(a_smem_ptr,
-			blockIdx.y * SMEM_M, block_k,
+			mtk::shgemm::device::get_m_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_M, block_k,
 			m, k,
 			a_dmem_ptr, lda
 			);
 	b_dram_loader(b_smem_ptr,
-			block_k, blockIdx.x * SMEM_N,
+			block_k, mtk::shgemm::device::get_n_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_N,
 			k, n,
 			b_dmem_ptr, ldb
 			);
@@ -100,12 +100,12 @@ struct shgemm_pipeline_core<
 #pragma unroll
 	for (; block_k < k; block_k += SMEM_K) {
 		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * A_smem_size,
-				blockIdx.y * SMEM_M, block_k,
+				mtk::shgemm::device::get_m_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_M, block_k,
 				m, k,
 				a_dmem_ptr, lda
 				);
 		b_dram_loader(b_smem_ptr + ((block_k / SMEM_K) & 0x1) * B_smem_size,
-				block_k, blockIdx.x * SMEM_N,
+				block_k, mtk::shgemm::device::get_n_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_N,
 				k, n,
 				b_dmem_ptr, ldb
 				);

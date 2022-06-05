@@ -7,9 +7,9 @@ namespace mtk {
 namespace shgemm {
 namespace detail {
 typedef void (*kernel_func_t)(
-			const std::size_t,
-			const std::size_t,
-			const std::size_t,
+			const unsigned,
+			const unsigned,
+			const unsigned,
 			const float,
 			const float* const, const std::size_t,
 			const half * const, const std::size_t,

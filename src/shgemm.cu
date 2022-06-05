@@ -33,9 +33,9 @@ template<
 	class TC_T
 	>
 __global__ void shgemm_kernel(
-		const std::size_t m,
-		const std::size_t n,
-		const std::size_t k,
+		const unsigned m,
+		const unsigned n,
+		const unsigned k,
 		const float alpha,
 		const float* const a_ptr, const std::size_t lda,
 		const half * const b_ptr, const std::size_t ldb,
@@ -50,8 +50,8 @@ __global__ void shgemm_kernel(
 
 	mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[(SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)];
 
-	const auto end_k = k * (blockIdx.z + 1) / num_k_slices;
-	const auto start_k = k * blockIdx.z / num_k_slices;
+	const auto end_k = k * (blockIdx.y + 1) / num_k_slices;
+	const auto start_k = k * blockIdx.y / num_k_slices;
 	mtk::shgemm::device::shgemm_pipeline_core<
 		SMEM_M, SMEM_N, SMEM_K,
 		FRAG_M, FRAG_N, FRAG_K,
@@ -93,13 +93,13 @@ __global__ void shgemm_kernel(
 	C_DMEM_STORER c_dmem_storer;
 	if (beta == 0.0f || num_k_slices == 1) {
 		c_dmem_storer(c_ptr, ldc,
-				blockIdx.y * SMEM_M, blockIdx.x * SMEM_N,
+				mtk::shgemm::device::get_m_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_M, mtk::shgemm::device::get_n_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_N,
 				m, n,
 				c_smem_ptr,
 				alpha, beta);
 	} else {
 		c_dmem_storer(w_ptr, (beta == 0.0f ? ldc : m),
-				blockIdx.y * SMEM_M, blockIdx.x * SMEM_N,
+				mtk::shgemm::device::get_m_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_M, mtk::shgemm::device::get_n_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_N,
 				m, n,
 				c_smem_ptr,
 				alpha, beta);
@@ -551,7 +551,7 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 					);
 		}
 
-		const dim3 grid_size((n + kernel.smem_n - 1) / kernel.smem_n, (m + kernel.smem_m - 1) / kernel.smem_m, num_k_slices);
+		const dim3 grid_size((n + kernel.smem_n - 1) / kernel.smem_n * (m + kernel.smem_m - 1) / kernel.smem_m, num_k_slices);
 		const dim3 block_size(kernel.block_size);
 
 		kernel.func<<<grid_size, block_size, kernel.smem_size, handle.cuda_stream>>>
@@ -604,7 +604,7 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 					);
 		}
 
-		const dim3 grid_size((n + kernel.smem_n - 1) / kernel.smem_n, (m + kernel.smem_m - 1) / kernel.smem_m);
+		const dim3 grid_size((n + kernel.smem_n - 1) / kernel.smem_n * (m + kernel.smem_m - 1) / kernel.smem_m);
 		const dim3 block_size(kernel.block_size);
 
 		kernel.func<<<grid_size, block_size, kernel.smem_size, handle.cuda_stream>>>
