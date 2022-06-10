@@ -41,6 +41,15 @@ std::string op_name_str(
 	return "T";
 }
 
+cublasOperation_t op_to_cublas(
+		const mtk::shgemm::operation_t op
+		) {
+	if (op == mtk::shgemm::op_n) {
+		return CUBLAS_OP_N;
+	}
+	return CUBLAS_OP_T;
+}
+
 void test_shgemm_core(
 		mtk::shgemm::shgemmHandle_t shgemm_handle,
 		mtk::shgemm::operation_t op_a,
@@ -175,7 +184,7 @@ void test_cublas_core(
 	const auto elapsed_time = mtk::gpu_monitor::get_elapsed_time(profiling_result);
 	const auto integrated_power_consumption = mtk::gpu_monitor::get_integrated_power_consumption(profiling_result);
 
-	std::printf("%s,%lu,%lu,%lu,%s,%s,%e,%e,%e,%lu,%u\n",
+	std::printf("cublas-%s,%lu,%lu,%lu,%s,%s,%e,%e,%e,%lu,%u\n",
 			compute_type.c_str(),
 			m, n, k,
 			op_name_str(op_a).c_str(),
@@ -265,8 +274,8 @@ int main() {
 				);
 		test_cublas_core(
 				*cublas_handle_uptr.get(),
-				CUBLAS_OP_N,
-				CUBLAS_OP_N,
+				op_to_cublas(op_a),
+				op_to_cublas(op_b),
 				a_fp32_uptr.get(),
 				b_fp32_uptr.get(),
 				c_fp32_uptr.get(),
@@ -275,8 +284,8 @@ int main() {
 				);
 		test_cublas_core(
 				*cublas_handle_uptr.get(),
-				CUBLAS_OP_N,
-				CUBLAS_OP_N,
+				op_to_cublas(op_a),
+				op_to_cublas(op_b),
 				a_fp32_uptr.get(),
 				b_fp32_uptr.get(),
 				c_fp32_uptr.get(),
