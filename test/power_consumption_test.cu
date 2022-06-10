@@ -141,7 +141,7 @@ void test_cublas_core(
 	if (compute_type == "TF32") {
 		cublasSetMathMode(cublas_handle, CUBLAS_TF32_TENSOR_OP_MATH);
 	} else {
-		cublasSetMathMode(cublas_handle, CUBLAS_TENSOR_OP_MATH);
+		cublasSetMathMode(cublas_handle, CUBLAS_DEFAULT_MATH);
 	}
 
 	const std::size_t test_count_0 = 16;
@@ -196,7 +196,7 @@ void test_cublas_core(
 			0
 			);
 	std::fflush(stdout);
-	cublasSetMathMode(cublas_handle, CUBLAS_TENSOR_OP_MATH);
+	cublasSetMathMode(cublas_handle, CUBLAS_DEFAULT_MATH);
 }
 
 __global__ void convert_B_to_fp16_kernel(

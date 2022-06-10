@@ -146,7 +146,7 @@ void test_cublas_core(
 	if (compute_type == "TF32") {
 		cublasSetMathMode(cublas_handle, CUBLAS_TF32_TENSOR_OP_MATH);
 	} else {
-		cublasSetMathMode(cublas_handle, CUBLAS_TENSOR_OP_MATH);
+		cublasSetMathMode(cublas_handle, CUBLAS_DEFAULT_MATH);
 	}
 
 	const float alpha = 1.0f, beta = 0.0f;
@@ -203,7 +203,7 @@ void test_cublas_core(
 			throughput,
 			0u
 			);
-	cublasSetMathMode(cublas_handle, CUBLAS_TENSOR_OP_MATH);
+	cublasSetMathMode(cublas_handle, CUBLAS_DEFAULT_MATH);
 	std::fflush(stdout);
 }
 
