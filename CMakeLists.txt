@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(shgemm LANGUAGES CXX CUDA)
 
-set(BUILD_SHGEMM_TEST ON)
+set(BUILD_SHGEMM_TEST OFF)
 
 find_package(CUDA 11.0 REQUIRED)
 find_package(CUDAToolkit REQUIRED)
