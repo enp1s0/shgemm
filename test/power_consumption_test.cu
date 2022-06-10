@@ -3,6 +3,7 @@
 #include <cutf/memory.hpp>
 #include <cutf/type.hpp>
 #include <cutf/curand.hpp>
+#include <cutf/cublas.hpp>
 #include <mateval/comparison_cuda.hpp>
 #include <gpu_monitor/gpu_monitor.hpp>
 #include <shgemm/shgemm.hpp>
@@ -10,7 +11,6 @@
 constexpr std::size_t min_log_DIM = 10;
 constexpr std::size_t max_log_DIM = 14;
 constexpr std::size_t log_DIM_interval = 1;
-constexpr auto compute_type = mtk::shgemm::tf32;
 constexpr auto op_a = mtk::shgemm::op_n;
 constexpr auto op_b = mtk::shgemm::op_n;
 
@@ -30,6 +30,24 @@ std::string op_name_str(
 		return "N";
 	}
 	return "T";
+}
+
+std::string op_name_str(
+		const cublasOperation_t op
+		) {
+	if (op == CUBLAS_OP_N) {
+		return "N";
+	}
+	return "T";
+}
+
+cublasOperation_t op_to_cublas(
+		const mtk::shgemm::operation_t op
+		) {
+	if (op == mtk::shgemm::op_n) {
+		return CUBLAS_OP_N;
+	}
+	return CUBLAS_OP_T;
 }
 
 void test_shgemm_core(
@@ -105,6 +123,82 @@ void test_shgemm_core(
 	std::fflush(stdout);
 }
 
+void test_cublas_core(
+		cublasHandle_t cublas_handle,
+		cublasOperation_t op_a,
+		cublasOperation_t op_b,
+		const float* const a_fp32_ptr,
+		const float* const b_fp32_ptr,
+		float* const c_fp32_ptr,
+		const std::size_t m,
+		const std::size_t n,
+		const std::size_t k,
+		const std::string compute_type
+		) {
+	const float alpha = 1.0f, beta = 0.0f;
+	const std::size_t measuring_time_in_sec = 10;
+
+	if (compute_type == "TF32") {
+		cublasSetMathMode(cublas_handle, CUBLAS_TF32_TENSOR_OP_MATH);
+	} else {
+		cublasSetMathMode(cublas_handle, CUBLAS_DEFAULT_MATH);
+	}
+
+	const std::size_t test_count_0 = 16;
+	const auto start_clock = std::chrono::system_clock::now();
+	for (std::size_t test_c = 0; test_c < test_count_0; test_c++) {
+		cublasSgemm(
+				cublas_handle,
+				op_a, op_b,
+				m, n, k,
+				&alpha,
+				a_fp32_ptr, (op_a == CUBLAS_OP_N ? m : k),
+				b_fp32_ptr, (op_b == CUBLAS_OP_N ? k : n),
+				&beta,
+				c_fp32_ptr, m
+				);
+	}
+	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
+	const auto end_clock = std::chrono::system_clock::now();
+	const auto elapsed_time_0 = std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() * 1e-6 / test_count_0;
+	const auto throughput_in_tflops = 2 * m * n * k / elapsed_time_0 * 1e-12;
+
+	const std::size_t test_count = std::max<std::size_t>(1, measuring_time_in_sec / elapsed_time_0);
+
+	const auto profiling_result = mtk::gpu_monitor::measure_power_consumption([&](){
+			CUTF_CHECK_ERROR(cudaDeviceSynchronize());
+			for (std::size_t test_c = 0; test_c < test_count; test_c++) {
+				cublasSgemm(
+							cublas_handle,
+							op_a, op_b,
+							m, n, k,
+							&alpha,
+							a_fp32_ptr, (op_a == CUBLAS_OP_N ? m : k),
+							b_fp32_ptr, (op_b == CUBLAS_OP_N ? k : n),
+							&beta,
+							c_fp32_ptr, m
+						);
+			}
+			CUTF_CHECK_ERROR(cudaDeviceSynchronize());
+		}, 50);
+	const auto elapsed_time = mtk::gpu_monitor::get_elapsed_time(profiling_result);
+	const auto integrated_power_consumption = mtk::gpu_monitor::get_integrated_power_consumption(profiling_result);
+
+	std::printf("cublas-%s,%lu,%lu,%lu,%s,%s,%e,%e,%e,%lu,%u\n",
+			compute_type.c_str(),
+			m, n, k,
+			op_name_str(op_a).c_str(),
+			op_name_str(op_b).c_str(),
+			throughput_in_tflops,
+			integrated_power_consumption / elapsed_time,
+			integrated_power_consumption / test_count,
+			test_count,
+			0
+			);
+	std::fflush(stdout);
+	cublasSetMathMode(cublas_handle, CUBLAS_DEFAULT_MATH);
+}
+
 __global__ void convert_B_to_fp16_kernel(
 		half* const fp16_ptr,
 		float* const fp32_ptr,
@@ -148,6 +242,7 @@ int main() {
 
 	mtk::shgemm::shgemmHandle_t shgemm_handle;
 	mtk::shgemm::create(shgemm_handle);
+	auto cublas_handle_uptr = cutf::cublas::get_cublas_unique_ptr();
 
 	std::printf("tc_t,m,n,k,op_a,op_b,,throughput_in_tflops,avg_power_consumption_in_W,integrated_power_consumption_in_Ws,test_count,kernel_level\n");
 	std::fflush(stdout);
@@ -164,7 +259,38 @@ int main() {
 				b_fp16_uptr.get(),
 				c_fp32_uptr.get(),
 				m, n, k,
-				compute_type
+				mtk::shgemm::tf32
+				);
+		test_shgemm_core(
+				shgemm_handle,
+				op_a,
+				op_b,
+				a_fp32_uptr.get(),
+				b_fp32_uptr.get(),
+				b_fp16_uptr.get(),
+				c_fp32_uptr.get(),
+				m, n, k,
+				mtk::shgemm::fp16
+				);
+		test_cublas_core(
+				*cublas_handle_uptr.get(),
+				op_to_cublas(op_a),
+				op_to_cublas(op_b),
+				a_fp32_uptr.get(),
+				b_fp32_uptr.get(),
+				c_fp32_uptr.get(),
+				m, n, k,
+				"TF32"
+				);
+		test_cublas_core(
+				*cublas_handle_uptr.get(),
+				op_to_cublas(op_a),
+				op_to_cublas(op_b),
+				a_fp32_uptr.get(),
+				b_fp32_uptr.get(),
+				c_fp32_uptr.get(),
+				m, n, k,
+				"FP32"
 				);
 	}
 	mtk::shgemm::destroy(shgemm_handle);
