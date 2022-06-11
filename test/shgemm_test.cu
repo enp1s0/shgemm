@@ -7,6 +7,8 @@
 #include <mateval/comparison_cuda.hpp>
 #include <shgemm/shgemm.hpp>
 
+//#define ENABLE_CUBLAS_TEST
+
 constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 5;
 constexpr std::size_t max_log_DIM = 14;
@@ -282,6 +284,7 @@ int main() {
 						m, n, k,
 						mtk::shgemm::fp16
 						);
+#ifdef ENABLE_CUBLAS_TEST
 				test_cublas_core(
 						*cublas_handle_uptr.get(),
 						op_to_cublas(op_a),
@@ -302,6 +305,7 @@ int main() {
 						m, n, k,
 						"FP32"
 						);
+#endif
 			}
 		}
 	}

@@ -8,6 +8,8 @@
 #include <gpu_monitor/gpu_monitor.hpp>
 #include <shgemm/shgemm.hpp>
 
+//#define ENABLE_CUBLAS_TEST
+
 constexpr std::size_t min_log_DIM = 10;
 constexpr std::size_t max_log_DIM = 14;
 constexpr std::size_t log_DIM_interval = 1;
@@ -272,6 +274,7 @@ int main() {
 				m, n, k,
 				mtk::shgemm::fp16
 				);
+#ifdef ENABLE_CUBLAS_TEST
 		test_cublas_core(
 				*cublas_handle_uptr.get(),
 				op_to_cublas(op_a),
@@ -292,6 +295,7 @@ int main() {
 				m, n, k,
 				"FP32"
 				);
+#endif
 	}
 	mtk::shgemm::destroy(shgemm_handle);
 }
