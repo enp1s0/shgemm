@@ -11,7 +11,6 @@ constexpr std::size_t matrix_N = 1lu << 7;
 constexpr std::size_t min_log_DIM = 11;
 constexpr std::size_t max_log_DIM = 22;
 constexpr std::size_t log_DIM_interval = 1;
-constexpr auto compute_type = mtk::shgemm::tf32;
 constexpr auto op_a = mtk::shgemm::op_n;
 constexpr auto op_b = mtk::shgemm::op_n;
 
@@ -164,7 +163,18 @@ int main() {
 				b_fp16_uptr.get(),
 				c_fp32_uptr.get(),
 				m, n, k,
-				compute_type
+				mtk::shgemm::tf32
+				);
+		test_shgemm_core(
+				shgemm_handle,
+				op_a,
+				op_b,
+				a_fp32_uptr.get(),
+				b_fp32_uptr.get(),
+				b_fp16_uptr.get(),
+				c_fp32_uptr.get(),
+				m, n, k,
+				mtk::shgemm::fp16
 				);
 	}
 	mtk::shgemm::destroy(shgemm_handle);

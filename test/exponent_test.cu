@@ -8,6 +8,8 @@
 #include <cublas.h>
 #include <cublas_v2.h>
 
+//#define ENABLE_CUBLAS_TEST
+
 constexpr std::size_t min_log_DIM = 6;
 constexpr std::size_t max_log_DIM = 12;
 constexpr std::size_t log_DIM_interval = 2;
@@ -274,7 +276,6 @@ int main() {
 							m, n, k,
 							mtk::shgemm::tf32
 							);
-					std::printf("%s,", matrix_name.c_str());
 					test_shgemm_core(
 							shgemm_handle,
 							op_a,
@@ -286,7 +287,7 @@ int main() {
 							m, n, k,
 							mtk::shgemm::fp16
 							);
-					std::printf("%s,", matrix_name.c_str());
+#ifdef ENABLE_CUBLAS_TEST
 					test_cublas(
 							cublas_handle,
 							convert_op_shgemm2cublas(op_a),
@@ -297,7 +298,6 @@ int main() {
 							m, n, k,
 							"tf32"
 							);
-					std::printf("%s,", matrix_name.c_str());
 					test_cublas(
 							cublas_handle,
 							convert_op_shgemm2cublas(op_a),
@@ -308,6 +308,7 @@ int main() {
 							m, n, k,
 							"fp32"
 							);
+#endif
 				}
 			}
 		}
