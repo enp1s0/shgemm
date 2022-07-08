@@ -7,7 +7,7 @@
 #include <mateval/comparison_cuda.hpp>
 #include <shgemm/shgemm.hpp>
 
-//#define ENABLE_CUBLAS_TEST
+//#define TEST_ALL
 
 constexpr std::size_t test_count = 1lu << 6;
 constexpr std::size_t min_log_DIM = 5;
@@ -15,6 +15,10 @@ constexpr std::size_t max_log_DIM = 14;
 constexpr std::size_t log_DIM_interval = 3;
 constexpr auto op_a = mtk::shgemm::op_n;
 constexpr auto op_b = mtk::shgemm::op_n;
+
+#ifndef TEST_ALL
+auto compute_type = mtk::shgemm::tf32;
+#endif
 
 mtk::mateval::layout_t convert_op_shgemm2mateval(
 		const mtk::shgemm::operation_t op
@@ -262,6 +266,7 @@ int main() {
 				const auto m = 1lu << log_M;
 				const auto n = 1lu << log_N;
 				const auto k = 1lu << log_K;
+#ifdef TEST_ALL
 				test_shgemm_core(
 						shgemm_handle,
 						op_a,
@@ -284,7 +289,6 @@ int main() {
 						m, n, k,
 						mtk::shgemm::fp16
 						);
-#ifdef ENABLE_CUBLAS_TEST
 				test_cublas_core(
 						*cublas_handle_uptr.get(),
 						op_to_cublas(op_a),
@@ -304,6 +308,18 @@ int main() {
 						c_fp32_uptr.get(),
 						m, n, k,
 						"FP32"
+						);
+#else
+				test_shgemm_core(
+						shgemm_handle,
+						op_a,
+						op_b,
+						a_fp32_uptr.get(),
+						b_fp32_uptr.get(),
+						b_fp16_uptr.get(),
+						c_fp32_uptr.get(),
+						m, n, k,
+						compute_type
 						);
 #endif
 			}
