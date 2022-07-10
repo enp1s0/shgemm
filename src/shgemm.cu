@@ -29,6 +29,7 @@ template<
 	class C_DMEM_STORER,
 	class SHGEMM_CORE,
 	unsigned NUM_STAGES,
+	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T
 	>
@@ -59,6 +60,7 @@ __global__ void shgemm_kernel(
 		B_DMEM_LOADER,
 		SHGEMM_CORE,
 		NUM_STAGES,
+		NUM_UNROLLINGS,
 		BLOCK_SIZE,
 		TC_T
 		> pipeline_core;
@@ -167,6 +169,7 @@ template<
 	unsigned FRAG_N,
 	unsigned FRAG_K,
 	unsigned NUM_STAGES,
+	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
 	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
@@ -186,6 +189,7 @@ struct kernel_ptr {
 					C_DMEM_STORER,
 					SHGEMM_CORE,
 					NUM_STAGES,
+					NUM_UNROLLINGS,
 					BLOCK_SIZE,
 					TC_T
 					>);
@@ -199,6 +203,7 @@ template<
 	unsigned FRAG_N,
 	unsigned FRAG_K,
 	unsigned NUM_STAGES,
+	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
 	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
@@ -218,6 +223,7 @@ struct atomic_kernel_ptr {
 					C_DMEM_STORER,
 					SHGEMM_CORE,
 					NUM_STAGES,
+					NUM_UNROLLINGS,
 					BLOCK_SIZE,
 					TC_T
 					>);
@@ -231,6 +237,7 @@ template<
 	unsigned FRAG_N,
 	unsigned FRAG_K,
 	unsigned NUM_STAGES,
+	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
 	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
@@ -250,6 +257,7 @@ struct pipline_kernel_ptr {
 					C_DMEM_STORER,
 					SHGEMM_CORE,
 					NUM_STAGES,
+					NUM_UNROLLINGS,
 					BLOCK_SIZE,
 					TC_T
 					>);
@@ -263,6 +271,7 @@ template<
 	unsigned FRAG_N,
 	unsigned FRAG_K,
 	unsigned NUM_STAGES,
+	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
 	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
@@ -282,6 +291,7 @@ struct atomic_pipline_kernel_ptr {
 					C_DMEM_STORER,
 					SHGEMM_CORE,
 					NUM_STAGES,
+					NUM_UNROLLINGS,
 					BLOCK_SIZE,
 					TC_T
 					>);
@@ -300,6 +310,7 @@ template<
 	unsigned FRAG_N,
 	unsigned FRAG_K,
 	unsigned NUM_STAGES,
+	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
 	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b,
@@ -313,15 +324,15 @@ void set_kernel(
 	mtk::shgemm::detail::kernel_func_t func;
 	if constexpr (USE_ATOMIC_STORER) {
 		if constexpr (USE_PIPELINE_CORE) {
-			func = atomic_pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+			func = atomic_pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b>::func;
 		} else {
-			func = atomic_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+			func = atomic_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b>::func;
 		}
 	} else {
 		if constexpr (USE_PIPELINE_CORE) {
-			func = pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+			func = pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b>::func;
 		} else {
-			func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+			func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b>::func;
 		}
 	}
 	const unsigned smem_size = get_shared_memory_size_in_byte<SMEM_M, SMEM_N, SMEM_K, NUM_STAGES, typename op_t2layout<op_a>::type, typename op_t2layout<op_b>::type>();
@@ -370,6 +381,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 32, SMEM_N = 32, SMEM_K = 128;
 		constexpr unsigned FRAG_M = 16, FRAG_N = 16, FRAG_K = 128;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_UNROLLINGS = 4;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -378,7 +390,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P0];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -387,6 +399,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 64;
 		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 1;
+		constexpr unsigned NUM_UNROLLINGS = 4;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -395,7 +408,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P1];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -404,6 +417,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_UNROLLINGS = 4;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -412,7 +426,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.tf32_nn_k_slicing_kernel;
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -424,6 +438,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 128;
 		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 128;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_UNROLLINGS = 4;
 
 		using TC_T = half;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -432,7 +447,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P0];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -441,6 +456,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 128;
 		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 128;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_UNROLLINGS = 4;
 
 		using TC_T = half;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -449,7 +465,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P1];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -458,6 +474,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_UNROLLINGS = 4;
 
 		using TC_T = half;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -466,7 +483,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.fp16_nn_k_slicing_kernel;
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
