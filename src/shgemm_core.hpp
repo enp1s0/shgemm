@@ -8,13 +8,13 @@ namespace shgemm {
 namespace device {
 
 template <unsigned SMEM_M, unsigned SMEM_N>
-__device__ unsigned get_m_block_id(const unsigned m, const unsigned) {
-	return blockIdx.x % ((m + SMEM_M - 1) / SMEM_M);
+__device__ unsigned get_m_block_id(const unsigned, const unsigned n) {
+	return blockIdx.x / ((n + SMEM_N - 1) / SMEM_N);
 }
 
 template <unsigned SMEM_M, unsigned SMEM_N>
-__device__ unsigned get_n_block_id(const unsigned m, const unsigned) {
-	return blockIdx.x / ((m + SMEM_M - 1) / SMEM_M);
+__device__ unsigned get_n_block_id(const unsigned, const unsigned n) {
+	return blockIdx.x % ((n + SMEM_N - 1) / SMEM_N);
 }
 
 template <class LAYOUT, unsigned SMEM_M, unsigned SMEM_K, unsigned FRAG_M>
