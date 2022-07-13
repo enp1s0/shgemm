@@ -377,11 +377,12 @@ void mtk::shgemm::create(
 		TF32-NN
 		=====================================*/
 	{
+		// Optimize for 4096x4096
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 32, SMEM_N = 32, SMEM_K = 128;
-		constexpr unsigned FRAG_M = 16, FRAG_N = 16, FRAG_K = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
-		constexpr unsigned NUM_UNROLLINGS = 4;
+		constexpr unsigned NUM_UNROLLINGS = 2;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -395,11 +396,12 @@ void mtk::shgemm::create(
 				);
 	}
 	{
+		// Optimize for 16384x16384
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 64;
-		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 32;
+		constexpr unsigned SMEM_M = 128, SMEM_N = 64, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 1;
-		constexpr unsigned NUM_UNROLLINGS = 4;
+		constexpr unsigned NUM_UNROLLINGS = 2;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -434,11 +436,12 @@ void mtk::shgemm::create(
 		FP16-NN
 		=====================================*/
 	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 128;
-		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 128;
+		// Optimize for 4096x4096
+		constexpr unsigned BLOCK_SIZE = 256;
+		constexpr unsigned SMEM_M = 128, SMEM_N = 128, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
-		constexpr unsigned NUM_UNROLLINGS = 4;
+		constexpr unsigned NUM_UNROLLINGS = 1;
 
 		using TC_T = half;
 		constexpr auto OP_A = mtk::shgemm::op_n;
@@ -452,11 +455,12 @@ void mtk::shgemm::create(
 				);
 	}
 	{
+		// Optimize for 16384x16384
 		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 32, SMEM_N = 64, SMEM_K = 128;
-		constexpr unsigned FRAG_M = 16, FRAG_N = 32, FRAG_K = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 32;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
-		constexpr unsigned NUM_UNROLLINGS = 4;
+		constexpr unsigned NUM_UNROLLINGS = 1;
 
 		using TC_T = half;
 		constexpr auto OP_A = mtk::shgemm::op_n;
