@@ -437,8 +437,8 @@ void mtk::shgemm::create(
 		=====================================*/
 	{
 		// Optimize for 4096x4096
-		constexpr unsigned BLOCK_SIZE = 256;
-		constexpr unsigned SMEM_M = 128, SMEM_N = 128, SMEM_K = 64;
+		constexpr unsigned BLOCK_SIZE = 128;
+		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 32;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
 		constexpr unsigned NUM_UNROLLINGS = 1;
@@ -456,9 +456,9 @@ void mtk::shgemm::create(
 	}
 	{
 		// Optimize for 16384x16384
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 32;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
+		constexpr unsigned BLOCK_SIZE = 256;
+		constexpr unsigned SMEM_M = 128, SMEM_N = 128, SMEM_K = 64;
+		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
 		constexpr unsigned NUM_UNROLLINGS = 1;
 
