@@ -19,6 +19,7 @@ template<
 	class B_DMEM_LOADER,
 	class SHGEMM_CORE,
 	unsigned NUM_STAGES,
+	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T
 	>
@@ -45,6 +46,7 @@ template<
 	class A_DMEM_LOADER,
 	class B_DMEM_LOADER,
 	class SHGEMM_CORE,
+	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T
 	>
@@ -55,6 +57,7 @@ struct shgemm_pipeline_core<
 	B_DMEM_LOADER,
 	SHGEMM_CORE,
 	2,
+	NUM_UNROLLINGS,
 	BLOCK_SIZE,
 	TC_T
 	> {
@@ -75,21 +78,21 @@ struct shgemm_pipeline_core<
 	constexpr unsigned A_smem_size = mtk::shgemm::device::get_A_smem_size<SMEM_M, SMEM_K, typename A_DMEM_LOADER::layout>::value;
 	constexpr unsigned B_smem_size = mtk::shgemm::device::get_B_smem_size<SMEM_K, SMEM_N, typename B_DMEM_LOADER::layout>::value;
 
-	std::size_t block_k = 0;
 	a_dram_loader(a_smem_ptr,
-			mtk::shgemm::device::get_m_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_M, block_k,
+			mtk::shgemm::device::get_m_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_M, 0,
 			m, k,
 			a_dmem_ptr, lda
 			);
 	b_dram_loader(b_smem_ptr,
-			block_k, mtk::shgemm::device::get_n_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_N,
+			0, mtk::shgemm::device::get_n_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_N,
 			k, n,
 			b_dmem_ptr, ldb
 			);
-	block_k += SMEM_K;
+	std::size_t block_k = SMEM_K;
 
 	// Initialize frag C
 	constexpr unsigned frag_c_length = (SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size);
+#pragma unroll
 	for (unsigned i = 0; i < frag_c_length; i++) {
 		mtk::wmma::tcec::fill_zero(frag_c[i]);
 	}
@@ -97,7 +100,7 @@ struct shgemm_pipeline_core<
 	cutf::cp_async::wait_all();
 	__syncthreads();
 	// MMA
-#pragma unroll
+#pragma unroll NUM_UNROLLINGS
 	for (; block_k < k; block_k += SMEM_K) {
 		a_dram_loader(a_smem_ptr + ((block_k / SMEM_K) & 0x1) * A_smem_size,
 				mtk::shgemm::device::get_m_block_id<SMEM_M, SMEM_N>(m, n) * SMEM_M, block_k,
