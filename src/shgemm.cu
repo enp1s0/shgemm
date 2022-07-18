@@ -382,6 +382,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 32;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_STAGES = 2;
 		constexpr unsigned NUM_UNROLLINGS = 2;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
@@ -391,7 +392,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P0];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -401,6 +402,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 128, SMEM_N = 64, SMEM_K = 32;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 1;
+		constexpr unsigned NUM_STAGES = 2;
 		constexpr unsigned NUM_UNROLLINGS = 2;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
@@ -410,7 +412,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P1];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -419,6 +421,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_STAGES = 2;
 		constexpr unsigned NUM_UNROLLINGS = 4;
 
 		using TC_T = nvcuda::wmma::precision::tf32;
@@ -428,7 +431,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.tf32_nn_k_slicing_kernel;
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -441,6 +444,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 32;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_STAGES = 2;
 		constexpr unsigned NUM_UNROLLINGS = 1;
 
 		using TC_T = half;
@@ -450,7 +454,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P0];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -460,6 +464,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 128, SMEM_N = 128, SMEM_K = 64;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_STAGES = 2;
 		constexpr unsigned NUM_UNROLLINGS = 1;
 
 		using TC_T = half;
@@ -469,7 +474,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P1];
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
@@ -478,6 +483,7 @@ void mtk::shgemm::create(
 		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
 		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
 		constexpr unsigned USE_PIPELINE_CORE = 0;
+		constexpr unsigned NUM_STAGES = 2;
 		constexpr unsigned NUM_UNROLLINGS = 4;
 
 		using TC_T = half;
@@ -487,7 +493,7 @@ void mtk::shgemm::create(
 
 		auto& kernel = handle.fp16_nn_k_slicing_kernel;
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
+		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
 				kernel, num_sm
 				);
 	}
