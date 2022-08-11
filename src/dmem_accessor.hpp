@@ -18,7 +18,7 @@ struct dmem_loader_n {
 			T* const smem_ptr,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
 			const unsigned dmem_size_m, const unsigned dmem_size_n,
-			const T* const dmem_ptr, const std::size_t ldd
+			const T* const dmem_ptr, const unsigned ldd
 			) {
 		static_assert(SMEM_M * SMEM_N >= BLOCK_SIZE * 8, "SMEM_M * SMEM_N >= BLOCK_SIZE must be satisfied");
 		if (dmem_start_m + SMEM_M <= dmem_size_m && dmem_start_n + SMEM_N <= dmem_size_n) {
@@ -27,7 +27,7 @@ struct dmem_loader_n {
 					const auto i = i_offset + threadIdx.x * 4;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::A_smem_skew);
 
 					// 128 bit memory access
@@ -38,7 +38,7 @@ struct dmem_loader_n {
 					const auto i = i_offset + threadIdx.x * 2;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::A_smem_skew);
 
 					// 64 bit memory access
@@ -49,7 +49,7 @@ struct dmem_loader_n {
 					const auto i = i_offset + threadIdx.x;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::A_smem_skew);
 
 					cutf::cp_async::cp_async<4>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
@@ -60,7 +60,7 @@ struct dmem_loader_n {
 				const auto i = i_offset + threadIdx.x;
 				const auto m = (i % SMEM_M) + dmem_start_m;
 				const auto n = (i / SMEM_M) + dmem_start_n;
-				const auto dmem_index = m + n * ldd;
+				const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 				const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::A_smem_skew);
 
 				if (m < dmem_size_m && n < dmem_size_n) {
@@ -80,7 +80,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 			half* const smem_ptr,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
 			const unsigned dmem_size_m, const unsigned dmem_size_n,
-			const half* const dmem_ptr, const std::size_t ldd
+			const half* const dmem_ptr, const unsigned ldd
 			) {
 		static_assert(SMEM_M * SMEM_N >= BLOCK_SIZE * 8, "SMEM_M * SMEM_N >= BLOCK_SIZE must be satisfied");
 		if (dmem_start_m + SMEM_M <= dmem_size_m && dmem_start_n + SMEM_N <= dmem_size_n) {
@@ -89,7 +89,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto i = i_offset + threadIdx.x * 8;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
 					cutf::cp_async::cp_async<16>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
@@ -99,7 +99,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto i = i_offset + threadIdx.x * 4;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
 					cutf::cp_async::cp_async<8>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
@@ -109,7 +109,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto i = i_offset + threadIdx.x * 2;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
 					cutf::cp_async::cp_async<4>(&smem_ptr[smem_index], &dmem_ptr[dmem_index]);
@@ -119,7 +119,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 					const auto i = i_offset + threadIdx.x;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
 					smem_ptr[smem_index] = dmem_ptr[dmem_index];
@@ -130,7 +130,7 @@ struct dmem_loader_n<half, SMEM_M, SMEM_N, BLOCK_SIZE> {
 				const auto i = i_offset + threadIdx.x;
 				const auto m = (i % SMEM_M) + dmem_start_m;
 				const auto n = (i / SMEM_M) + dmem_start_n;
-				const auto dmem_index = m + n * ldd;
+				const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 				const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::B_smem_skew);
 
 				auto v = cutf::type::cast<half>(0);
@@ -152,7 +152,7 @@ struct dmem_loader_row_major {
 			T* const smem_ptr,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
 			const unsigned dmem_size_m, const unsigned dmem_size_n,
-			const T* const dmem_ptr, const std::size_t ldd
+			const T* const dmem_ptr, const unsigned ldd
 			) {
 		dmem_loader_n<T, SMEM_N, SMEM_M, BLOCK_SIZE>{}(
 				smem_ptr,
@@ -170,7 +170,7 @@ struct dmem_loader_col_major {
 			T* const smem_ptr,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
 			const unsigned dmem_size_m, const unsigned dmem_size_n,
-			const T* const dmem_ptr, const std::size_t ldd
+			const T* const dmem_ptr, const unsigned ldd
 			) {
 		dmem_loader_n<T, SMEM_M, SMEM_N, BLOCK_SIZE>{}(
 				smem_ptr,
@@ -187,7 +187,7 @@ struct dmem_loader_col_major {
 template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_storer_n {
 	__device__ void operator()(
-			T* const dmem_ptr, const std::size_t ldd,
+			T* const dmem_ptr, const unsigned ldd,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
 			const unsigned dmem_size_m, const unsigned dmem_size_n,
 			const T* const smem_ptr,
@@ -200,7 +200,7 @@ struct dmem_storer_n {
 						const auto i = i_offset + threadIdx.x * 4;
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
-						const auto dmem_index = m + n * ldd;
+						const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						// 128 bit memory access
@@ -216,7 +216,7 @@ struct dmem_storer_n {
 						const auto i = i_offset + threadIdx.x * 2;
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
-						const auto dmem_index = m + n * ldd;
+						const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						// 64 bit memory access
@@ -230,7 +230,7 @@ struct dmem_storer_n {
 						const auto i = i_offset + threadIdx.x;
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
-						const auto dmem_index = m + n * ldd;
+						const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						dmem_ptr[dmem_index] = smem_ptr[smem_index] * alpha;
@@ -241,7 +241,7 @@ struct dmem_storer_n {
 					const auto i = i_offset + threadIdx.x;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 					if (m >= dmem_size_m || n >= dmem_size_n) {
@@ -258,7 +258,7 @@ struct dmem_storer_n {
 						const auto i = i_offset + threadIdx.x * 4;
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
-						const auto dmem_index = m + n * ldd;
+						const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						// 128 bit memory access
@@ -275,7 +275,7 @@ struct dmem_storer_n {
 						const auto i = i_offset + threadIdx.x * 2;
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
-						const auto dmem_index = m + n * ldd;
+						const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						// 64 bit memory access
@@ -290,7 +290,7 @@ struct dmem_storer_n {
 						const auto i = i_offset + threadIdx.x;
 						const auto m = (i % SMEM_M) + dmem_start_m;
 						const auto n = (i / SMEM_M) + dmem_start_n;
-						const auto dmem_index = m + n * ldd;
+						const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 						const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 						dmem_ptr[dmem_index] = smem_ptr[smem_index] * alpha + dmem_ptr[dmem_index] + beta;
@@ -301,7 +301,7 @@ struct dmem_storer_n {
 					const auto i = i_offset + threadIdx.x;
 					const auto m = (i % SMEM_M) + dmem_start_m;
 					const auto n = (i / SMEM_M) + dmem_start_n;
-					const auto dmem_index = m + n * ldd;
+					const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 					const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 					if (m >= dmem_size_m || n >= dmem_size_n) {
@@ -321,7 +321,7 @@ struct dmem_storer_n {
 template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_atomic_storer_n {
 	__device__ void operator()(
-			T* const dmem_ptr, const std::size_t ldd,
+			T* const dmem_ptr, const unsigned ldd,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
 			const unsigned dmem_size_m, const unsigned dmem_size_n,
 			const T* const smem_ptr,
@@ -331,7 +331,7 @@ struct dmem_atomic_storer_n {
 			const auto i = i_offset + threadIdx.x;
 			const auto m = (i % SMEM_M) + dmem_start_m;
 			const auto n = (i / SMEM_M) + dmem_start_n;
-			const auto dmem_index = m + n * ldd;
+			const auto dmem_index = m + n * static_cast<std::uint64_t>(ldd);
 			const auto smem_index = (i % SMEM_M) + (i / SMEM_M) * (SMEM_M + mtk::shgemm::device::C_smem_skew);
 
 			if (m >= dmem_size_m || n >= dmem_size_n) {

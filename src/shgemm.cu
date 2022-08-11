@@ -38,10 +38,10 @@ __global__ void shgemm_kernel(
 		const unsigned n,
 		const unsigned k,
 		const float alpha,
-		const float* const a_ptr, const std::size_t lda,
-		const half * const b_ptr, const std::size_t ldb,
+		const float* const a_ptr, const unsigned lda,
+		const half * const b_ptr, const unsigned ldb,
 		const float beta,
-		float* const c_ptr, const std::size_t ldc,
+		float* const c_ptr, const unsigned ldc,
 		float* const w_ptr = nullptr, const unsigned num_k_slices = 1
 		) {
 
@@ -112,7 +112,7 @@ __global__ void init_working_memory_kernel(
 		float* const w_ptr,
 		const unsigned m,
 		const unsigned n,
-		const std::size_t ld
+		const unsigned ld
 		) {
 	const auto tid = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tid >= m * n) {
@@ -127,10 +127,10 @@ void init_working_memory(
 		float* const w_ptr,
 		const unsigned m,
 		const unsigned n,
-		const std::size_t ld,
+		const unsigned ld,
 		cudaStream_t cuda_stream) {
 	const std::size_t block_size = 256;
-	const std::size_t size = m * n;
+	const std::size_t size = static_cast<std::size_t>(m) * n;
 	init_working_memory_kernel<<<(size + block_size - 1) / block_size, block_size, 0, cuda_stream>>>(w_ptr, m, n, ld);
 }
 
