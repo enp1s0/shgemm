@@ -28,8 +28,8 @@ struct shgemm_pipeline_core {
 			const unsigned m,
 			const unsigned n,
 			const unsigned k,
-			const float* const a_dmem_ptr, const std::size_t lda,
-			const half * const b_dmem_ptr, const std::size_t ldb,
+			const float* const a_dmem_ptr, const unsigned lda,
+			const half * const b_dmem_ptr, const unsigned ldb,
 			float* const a_smem_ptr,
 			half * const b_smem_ptr,
 			mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[(SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)]
@@ -51,7 +51,7 @@ struct shgemm_pipeline_core {
 			k, n,
 			b_dmem_ptr, ldb
 			);
-	std::size_t block_k = SMEM_K;
+	unsigned block_k = SMEM_K;
 
 	// Initialize frag C
 	constexpr unsigned frag_c_length = (SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size);
@@ -120,8 +120,8 @@ struct shgemm_pipeline_core<
 			const unsigned m,
 			const unsigned n,
 			const unsigned k,
-			const float* const a_dmem_ptr, const std::size_t lda,
-			const half * const b_dmem_ptr, const std::size_t ldb,
+			const float* const a_dmem_ptr, const unsigned lda,
+			const half * const b_dmem_ptr, const unsigned ldb,
 			float* const a_smem_ptr,
 			half * const b_smem_ptr,
 			mtk::wmma::tcec::fragment<nvcuda::wmma::accumulator, FRAG_M, FRAG_N, FRAG_K, TC_T, void, mtk::shgemm::device::A_Policy<TC_T>> frag_c[(SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)]
@@ -143,7 +143,7 @@ struct shgemm_pipeline_core<
 			k, n,
 			b_dmem_ptr, ldb
 			);
-	std::size_t block_k = SMEM_K;
+	unsigned block_k = SMEM_K;
 
 	// Initialize frag C
 	constexpr unsigned frag_c_length = (SMEM_M * SMEM_N) / (FRAG_M * FRAG_N) / (BLOCK_SIZE / mtk::shgemm::utils::warp_size);

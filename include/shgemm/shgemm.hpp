@@ -11,10 +11,10 @@ typedef void (*kernel_func_t)(
 			const unsigned,
 			const unsigned,
 			const float,
-			const float* const, const std::size_t,
-			const half * const, const std::size_t,
+			const float* const, const unsigned,
+			const half * const, const unsigned,
 			const float,
-			float* const, const std::size_t,
+			float* const, const unsigned,
 			float* const, const unsigned
 			);
 
