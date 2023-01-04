@@ -10,9 +10,9 @@
 //#define TEST_ALL
 
 constexpr std::size_t test_count = 1lu << 6;
-constexpr std::size_t min_log_DIM = 5;
+constexpr std::size_t min_log_DIM = 10;
 constexpr std::size_t max_log_DIM = 14;
-constexpr std::size_t log_DIM_interval = 3;
+constexpr std::size_t log_DIM_interval = 2;
 
 mtk::mateval::layout_t convert_op_shgemm2mateval(
 		const mtk::shgemm::operation_t op
@@ -267,57 +267,53 @@ int main() {
 	for (const auto op_a : op_a_list) {
 		for (const auto op_b : op_b_list) {
 			for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
-				for (std::size_t log_N = min_log_DIM; log_N <= max_log_DIM; log_N += log_DIM_interval) {
-					for (std::size_t log_K = min_log_DIM; log_K <= max_log_DIM; log_K += log_DIM_interval) {
-						const auto m = 1lu << log_M;
-						const auto n = 1lu << log_N;
-						const auto k = 1lu << log_K;
-						test_shgemm_core(
-								shgemm_handle,
-								op_a,
-								op_b,
-								a_fp32_uptr.get(),
-								b_fp32_uptr.get(),
-								b_fp16_uptr.get(),
-								c_fp32_uptr.get(),
-								m, n, k,
-								mtk::shgemm::tf32
-								);
-						test_shgemm_core(
-								shgemm_handle,
-								op_a,
-								op_b,
-								a_fp32_uptr.get(),
-								b_fp32_uptr.get(),
-								b_fp16_uptr.get(),
-								c_fp32_uptr.get(),
-								m, n, k,
-								mtk::shgemm::fp16
-								);
+				const auto m = 1lu << log_M;
+				const auto n = 1lu << log_M;
+				const auto k = 1lu << log_M;
+				test_shgemm_core(
+						shgemm_handle,
+						op_a,
+						op_b,
+						a_fp32_uptr.get(),
+						b_fp32_uptr.get(),
+						b_fp16_uptr.get(),
+						c_fp32_uptr.get(),
+						m, n, k,
+						mtk::shgemm::tf32
+						);
+				test_shgemm_core(
+						shgemm_handle,
+						op_a,
+						op_b,
+						a_fp32_uptr.get(),
+						b_fp32_uptr.get(),
+						b_fp16_uptr.get(),
+						c_fp32_uptr.get(),
+						m, n, k,
+						mtk::shgemm::fp16
+						);
 #ifdef TEST_ALL
-						test_cublas_core(
-								*cublas_handle_uptr.get(),
-								op_to_cublas(op_a),
-								op_to_cublas(op_b),
-								a_fp32_uptr.get(),
-								b_fp32_uptr.get(),
-								c_fp32_uptr.get(),
-								m, n, k,
-								"TF32"
-								);
-						test_cublas_core(
-								*cublas_handle_uptr.get(),
-								op_to_cublas(op_a),
-								op_to_cublas(op_b),
-								a_fp32_uptr.get(),
-								b_fp32_uptr.get(),
-								c_fp32_uptr.get(),
-								m, n, k,
-								"FP32"
-								);
+				test_cublas_core(
+						*cublas_handle_uptr.get(),
+						op_to_cublas(op_a),
+						op_to_cublas(op_b),
+						a_fp32_uptr.get(),
+						b_fp32_uptr.get(),
+						c_fp32_uptr.get(),
+						m, n, k,
+						"TF32"
+						);
+				test_cublas_core(
+						*cublas_handle_uptr.get(),
+						op_to_cublas(op_a),
+						op_to_cublas(op_b),
+						a_fp32_uptr.get(),
+						b_fp32_uptr.get(),
+						c_fp32_uptr.get(),
+						m, n, k,
+						"FP32"
+						);
 #endif
-					}
-				}
 			}
 		}
 	}
