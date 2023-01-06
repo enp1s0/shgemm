@@ -47,16 +47,22 @@ struct shgemmHandle_t {
 	cudaStream_t cuda_stream;
 
 	detail::kernel fp16_nn_kernel[detail::num_levels];
+	detail::kernel fp16_tn_kernel[detail::num_levels];
+	detail::kernel fp16_nt_kernel[detail::num_levels];
+	detail::kernel fp16_tt_kernel[detail::num_levels];
 	detail::kernel tf32_nn_kernel[detail::num_levels];
+	detail::kernel tf32_tn_kernel[detail::num_levels];
+	detail::kernel tf32_nt_kernel[detail::num_levels];
+	detail::kernel tf32_tt_kernel[detail::num_levels];
+
 	detail::kernel fp16_nn_k_slicing_kernel;
+	detail::kernel fp16_tn_k_slicing_kernel;
+	detail::kernel fp16_nt_k_slicing_kernel;
+	detail::kernel fp16_tt_k_slicing_kernel;
 	detail::kernel tf32_nn_k_slicing_kernel;
-	//detail::kernel fp16_tn_kernel[detail::num_levels];
-	//detail::kernel fp16_nt_kernel[detail::num_levels];
-	//detail::kernel fp16_tt_kernel[detail::num_levels];
-	//detail::kernel tf32_nn_kernel[detail::num_levels];
-	//detail::kernel tf32_tn_kernel[detail::num_levels];
-	//detail::kernel tf32_nt_kernel[detail::num_levels];
-	//detail::kernel tf32_tt_kernel[detail::num_levels];
+	detail::kernel tf32_tn_k_slicing_kernel;
+	detail::kernel tf32_nt_k_slicing_kernel;
+	detail::kernel tf32_tt_k_slicing_kernel;
 
 	unsigned debug_mode = 0;
 

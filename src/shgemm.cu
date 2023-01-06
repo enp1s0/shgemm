@@ -373,130 +373,35 @@ void mtk::shgemm::create(
 	cudaDeviceProp prop;
 	cudaGetDeviceProperties(&prop, 0);
 	const unsigned num_sm = prop.multiProcessorCount;
-	/*=======================================
-		TF32-NN
-		=====================================*/
-	{
-		// Optimize for 4096x4096
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 32;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
-		constexpr unsigned USE_PIPELINE_CORE = 0;
-		constexpr unsigned NUM_STAGES = 2;
-		constexpr unsigned NUM_UNROLLINGS = 1;
 
-		using TC_T = nvcuda::wmma::precision::tf32;
-		constexpr auto OP_A = mtk::shgemm::op_n;
-		constexpr auto OP_B = mtk::shgemm::op_n;
-		constexpr unsigned USE_ATOMIC_STORER = 0;
+	// TF32
+	set_kernel<  32,  64,  64, 16,  32,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  64,  64,  32, 16,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32, 128,  64, 32,  32,  64, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 2, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel<  64, 128,  64, 32,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel<  64, 128,  64, 32,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P1], num_sm);
+	// FP16
+	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32,  64,  64, 16,  32,  32, 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel< 128, 128,  32, 16,  16,  32, 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P1], num_sm);
 
-		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P0];
+	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 1>(handle.tf32_nn_k_slicing_kernel, num_sm);
+	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 1>(handle.tf32_tn_k_slicing_kernel, num_sm);
+	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 1>(handle.tf32_nt_k_slicing_kernel, num_sm);
+	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 1>(handle.tf32_tt_k_slicing_kernel, num_sm);
 
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
-				kernel, num_sm
-				);
-	}
-	{
-		// Optimize for 16384x16384
-		constexpr unsigned BLOCK_SIZE = 256;
-		constexpr unsigned SMEM_M = 128, SMEM_N = 128, SMEM_K = 64;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
-		constexpr unsigned USE_PIPELINE_CORE = 1;
-		constexpr unsigned NUM_STAGES = 2;
-		constexpr unsigned NUM_UNROLLINGS = 2;
-
-		using TC_T = nvcuda::wmma::precision::tf32;
-		constexpr auto OP_A = mtk::shgemm::op_n;
-		constexpr auto OP_B = mtk::shgemm::op_n;
-		constexpr unsigned USE_ATOMIC_STORER = 0;
-
-		auto& kernel = handle.tf32_nn_kernel[mtk::shgemm::detail::P1];
-
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
-				kernel, num_sm
-				);
-	}
-	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
-		constexpr unsigned USE_PIPELINE_CORE = 0;
-		constexpr unsigned NUM_STAGES = 2;
-		constexpr unsigned NUM_UNROLLINGS = 4;
-
-		using TC_T = nvcuda::wmma::precision::tf32;
-		constexpr auto OP_A = mtk::shgemm::op_n;
-		constexpr auto OP_B = mtk::shgemm::op_n;
-		constexpr unsigned USE_ATOMIC_STORER = 1;
-
-		auto& kernel = handle.tf32_nn_k_slicing_kernel;
-
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
-				kernel, num_sm
-				);
-	}
-	/*=======================================
-		FP16-NN
-		=====================================*/
-	{
-		// Optimize for 4096x4096
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 128, SMEM_K = 32;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
-		constexpr unsigned USE_PIPELINE_CORE = 0;
-		constexpr unsigned NUM_STAGES = 2;
-		constexpr unsigned NUM_UNROLLINGS = 1;
-
-		using TC_T = half;
-		constexpr auto OP_A = mtk::shgemm::op_n;
-		constexpr auto OP_B = mtk::shgemm::op_n;
-		constexpr unsigned USE_ATOMIC_STORER = 0;
-
-		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P0];
-
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
-				kernel, num_sm
-				);
-	}
-	{
-		// Optimize for 16384x16384
-		constexpr unsigned BLOCK_SIZE = 256;
-		constexpr unsigned SMEM_M = 128, SMEM_N = 128, SMEM_K = 64;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 64, FRAG_K = 32;
-		constexpr unsigned USE_PIPELINE_CORE = 0;
-		constexpr unsigned NUM_STAGES = 2;
-		constexpr unsigned NUM_UNROLLINGS = 1;
-
-		using TC_T = half;
-		constexpr auto OP_A = mtk::shgemm::op_n;
-		constexpr auto OP_B = mtk::shgemm::op_n;
-		constexpr unsigned USE_ATOMIC_STORER = 0;
-
-		auto& kernel = handle.fp16_nn_kernel[mtk::shgemm::detail::P1];
-
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
-				kernel, num_sm
-				);
-	}
-	{
-		constexpr unsigned BLOCK_SIZE = 128;
-		constexpr unsigned SMEM_M = 64, SMEM_N = 64, SMEM_K = 64;
-		constexpr unsigned FRAG_M = 32, FRAG_N = 32, FRAG_K = 64;
-		constexpr unsigned USE_PIPELINE_CORE = 0;
-		constexpr unsigned NUM_STAGES = 2;
-		constexpr unsigned NUM_UNROLLINGS = 4;
-
-		using TC_T = half;
-		constexpr auto OP_A = mtk::shgemm::op_n;
-		constexpr auto OP_B = mtk::shgemm::op_n;
-		constexpr unsigned USE_ATOMIC_STORER = 1;
-
-		auto& kernel = handle.fp16_nn_k_slicing_kernel;
-
-		set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, OP_A, OP_B, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(
-				kernel, num_sm
-				);
-	}
+	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 1>(handle.fp16_nn_k_slicing_kernel, num_sm);
+	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 1>(handle.fp16_tn_k_slicing_kernel, num_sm);
+	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 1>(handle.fp16_nt_k_slicing_kernel, num_sm);
+	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 1>(handle.fp16_tt_k_slicing_kernel, num_sm);
 }
 
 void mtk::shgemm::destroy(
@@ -541,11 +446,17 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 	if (m * n <= handle.max_working_memory_num_elements && k >= 4096 && *beta_ptr == 0.f) {
 		mtk::shgemm::detail::kernel kernel;
 		if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
-			if (compute_type == mtk::shgemm::fp16) {
-				kernel = handle.fp16_nn_k_slicing_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) {
-				kernel = handle.tf32_nn_k_slicing_kernel;
-			}
+			if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_nn_k_slicing_kernel;
+			} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_nn_k_slicing_kernel;}
+		} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
+			if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_tn_k_slicing_kernel;
+			} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_tn_k_slicing_kernel;}
+		} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
+			if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_nt_k_slicing_kernel;
+			} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_nt_k_slicing_kernel;}
+		} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
+			if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_tt_k_slicing_kernel;
+			} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_tt_k_slicing_kernel;}
 		}
 
 		const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
@@ -598,13 +509,20 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 	} else {
 		mtk::shgemm::detail::kernel* kernel_list = nullptr;
 		if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
-			if (compute_type == mtk::shgemm::fp16) {
-				kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nn_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) {
-				kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nn_kernel;
-			}
+			if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nn_kernel;
+			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nn_kernel;}
+		} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
+			if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_tn_kernel;
+			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tn_kernel;}
+		} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
+			if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nt_kernel;
+			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nt_kernel;}
+		} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
+			if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_tt_kernel;
+			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tt_kernel;}
 		}
 
+		// larger value is for larger shape
 		unsigned kernel_level = mtk::shgemm::detail::num_levels - 1;
 		if (handle.fixed_lernel_level >= detail::num_levels) {
 			kernel_level = mtk::shgemm::detail::num_levels - 1;
