@@ -375,23 +375,23 @@ void mtk::shgemm::create(
 	const unsigned num_sm = prop.multiProcessorCount;
 
 	// TF32
-	set_kernel<64 , 128, 32 , 32 , 64 , 32 , 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<128, 128, 64 , 32 , 64 , 32 , 2, 2, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel<64 , 128, 32 , 32 , 64 , 32 , 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<128, 128, 64 , 32 , 64 , 32 , 2, 2, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel<64 , 128, 32 , 32 , 64 , 32 , 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<128, 128, 64 , 32 , 64 , 32 , 2, 2, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel<64 , 128, 32 , 32 , 64 , 32 , 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<128, 128, 64 , 32 , 64 , 32 , 2, 2, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel<  32,  64,  64, 16,  32,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  64,  64,  32, 16,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32, 128,  64, 32,  32,  64, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 2, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel<  64, 128,  64, 32,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel<  64, 128,  64, 32,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P1], num_sm);
 	// FP16
-	set_kernel<64 , 128, 32 , 32 , 64 , 32 , 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<128, 128, 64 , 32 , 64 , 32 , 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel<64 , 128, 32 , 32 , 64 , 32 , 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<128, 128, 64 , 32 , 64 , 32 , 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel<64 , 128, 32 , 32 , 64 , 32 , 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<128, 128, 64 , 32 , 64 , 32 , 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel<64 , 128, 32 , 32 , 64 , 32 , 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<128, 128, 64 , 32 , 64 , 32 , 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32,  64,  64, 16,  32,  32, 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel< 128, 128,  32, 16,  16,  32, 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P1], num_sm);
 
 	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 1>(handle.tf32_nn_k_slicing_kernel, num_sm);
 	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 1>(handle.tf32_tn_k_slicing_kernel, num_sm);
@@ -522,6 +522,7 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tt_kernel;}
 		}
 
+		// larger value is for larger shape
 		unsigned kernel_level = mtk::shgemm::detail::num_levels - 1;
 		if (handle.fixed_lernel_level >= detail::num_levels) {
 			kernel_level = mtk::shgemm::detail::num_levels - 1;
