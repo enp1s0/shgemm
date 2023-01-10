@@ -81,13 +81,23 @@ __global__ void shgemm_kernel(
 	float* const c_smem_ptr = smem;
 	for (unsigned matrix_id_offset = 0; matrix_id_offset < num_submatrices; matrix_id_offset += BLOCK_SIZE / mtk::shgemm::utils::warp_size) {
 		const unsigned matrix_id = matrix_id_offset + (threadIdx.x / mtk::shgemm::utils::warp_size);
-		const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
-		const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
-		mtk::wmma::tcec::store_matrix_sync(
-				c_smem_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * (SMEM_M + mtk::shgemm::device::C_smem_skew),
-				frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
-				SMEM_M + mtk::shgemm::device::C_smem_skew,
-				nvcuda::wmma::mem_col_major);
+		if constexpr (std::is_same<typename C_DMEM_STORER::layout, mtk::shgemm::utils::col_major>::value) {
+			const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
+			const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
+			mtk::wmma::tcec::store_matrix_sync(
+					c_smem_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * (SMEM_M + mtk::shgemm::device::C_smem_skew),
+					frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
+					SMEM_M + mtk::shgemm::device::C_smem_skew,
+					nvcuda::wmma::mem_col_major);
+		} else {
+			const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
+			const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
+			mtk::wmma::tcec::store_matrix_sync(
+					c_smem_ptr + matrix_id_n * FRAG_N + matrix_id_m * FRAG_M * (SMEM_N + mtk::shgemm::device::C_smem_skew),
+					frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
+					SMEM_N + mtk::shgemm::device::C_smem_skew,
+					nvcuda::wmma::mem_row_major);
+		}
 	}
 
 	// Store smem C to dmem

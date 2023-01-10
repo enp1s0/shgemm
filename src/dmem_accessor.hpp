@@ -317,6 +317,7 @@ struct dmem_storer_n {
 
 template <mtk::shgemm::operation_t op, class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_storer {
+	using layout = mtk::shgemm::utils::col_major;
 	__device__ void operator()(
 			T* const dmem_ptr, const unsigned ldd,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
@@ -336,6 +337,7 @@ struct dmem_storer {
 
 template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_storer<mtk::shgemm::op_t, T, SMEM_M, SMEM_N, BLOCK_SIZE> {
+	using layout = mtk::shgemm::utils::row_major;
 	__device__ void operator()(
 			T* const dmem_ptr, const unsigned ldd,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
@@ -383,6 +385,7 @@ struct dmem_atomic_storer_n {
 
 template <mtk::shgemm::operation_t op, class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_atomic_storer {
+	using layout = mtk::shgemm::utils::col_major;
 	__device__ void operator()(
 			T* const dmem_ptr, const unsigned ldd,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
@@ -402,6 +405,7 @@ struct dmem_atomic_storer {
 
 template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
 struct dmem_atomic_storer<mtk::shgemm::op_t, T, SMEM_M, SMEM_N, BLOCK_SIZE> {
+	using layout = mtk::shgemm::utils::row_major;
 	__device__ void operator()(
 			T* const dmem_ptr, const unsigned ldd,
 			const unsigned dmem_start_m, const unsigned dmem_start_n,
