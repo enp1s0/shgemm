@@ -118,6 +118,42 @@ mtk::shgemm::detail::kernel_level shgemm(
 		const operation_t op_c = op_n
 		);
 
+inline mtk::shgemm::detail::kernel_level hsgemm(
+		const shgemmHandle_t handle,
+		const operation_t op_a,
+		const operation_t op_b,
+		const std::size_t m,
+		const std::size_t n,
+		const std::size_t k,
+		const float* const alpha_ptr,
+		const half * const a_ptr, const std::size_t lda,
+		const float* const b_ptr, const std::size_t ldb,
+		const float* const beta_ptr,
+		float* const c_ptr, const std::size_t ldc,
+		const tc_t compute_type,
+		const operation_t op_c = op_n
+		) {
+	const auto inv_op = [&](const mtk::shgemm::operation_t op) {
+		if (op == op_n) {
+			return op_t;
+		}
+		return op_n;
+	};
+	return shgemm(
+			handle,
+			inv_op(op_a),
+			inv_op(op_b),
+			n, m, k,
+			alpha_ptr,
+			b_ptr, ldb,
+			a_ptr, lda,
+			beta_ptr,
+			c_ptr, ldc,
+			compute_type,
+			inv_op(op_c)
+			);
+}
+
 } // namespace shgemm
 } // namespace mtk
 #endif
