@@ -141,8 +141,8 @@ inline mtk::shgemm::detail::kernel_level hsgemm(
 	};
 	return shgemm(
 			handle,
-			inv_op(op_a),
 			inv_op(op_b),
+			inv_op(op_a),
 			n, m, k,
 			alpha_ptr,
 			b_ptr, ldb,
