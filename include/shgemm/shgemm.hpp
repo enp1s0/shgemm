@@ -64,6 +64,25 @@ struct shgemmHandle_t {
 	detail::kernel tf32_nt_k_slicing_kernel;
 	detail::kernel tf32_tt_k_slicing_kernel;
 
+	// Transposed C
+	detail::kernel fp16_nn_t_kernel[detail::num_levels];
+	detail::kernel fp16_tn_t_kernel[detail::num_levels];
+	detail::kernel fp16_nt_t_kernel[detail::num_levels];
+	detail::kernel fp16_tt_t_kernel[detail::num_levels];
+	detail::kernel tf32_nn_t_kernel[detail::num_levels];
+	detail::kernel tf32_tn_t_kernel[detail::num_levels];
+	detail::kernel tf32_nt_t_kernel[detail::num_levels];
+	detail::kernel tf32_tt_t_kernel[detail::num_levels];
+
+	detail::kernel fp16_nn_t_k_slicing_kernel;
+	detail::kernel fp16_tn_t_k_slicing_kernel;
+	detail::kernel fp16_nt_t_k_slicing_kernel;
+	detail::kernel fp16_tt_t_k_slicing_kernel;
+	detail::kernel tf32_nn_t_k_slicing_kernel;
+	detail::kernel tf32_tn_t_k_slicing_kernel;
+	detail::kernel tf32_nt_t_k_slicing_kernel;
+	detail::kernel tf32_tt_t_k_slicing_kernel;
+
 	unsigned debug_mode = 0;
 
 	detail::kernel_level fixed_lernel_level;
@@ -95,8 +114,45 @@ mtk::shgemm::detail::kernel_level shgemm(
 		const half * const b_ptr, const std::size_t ldb,
 		const float* const beta_ptr,
 		float* const c_ptr, const std::size_t ldc,
-		const tc_t compute_type
+		const tc_t compute_type,
+		const operation_t op_c = op_n
 		);
+
+inline mtk::shgemm::detail::kernel_level hsgemm(
+		const shgemmHandle_t handle,
+		const operation_t op_a,
+		const operation_t op_b,
+		const std::size_t m,
+		const std::size_t n,
+		const std::size_t k,
+		const float* const alpha_ptr,
+		const half * const a_ptr, const std::size_t lda,
+		const float* const b_ptr, const std::size_t ldb,
+		const float* const beta_ptr,
+		float* const c_ptr, const std::size_t ldc,
+		const tc_t compute_type,
+		const operation_t op_c = op_n
+		) {
+	const auto inv_op = [&](const mtk::shgemm::operation_t op) {
+		if (op == op_n) {
+			return op_t;
+		}
+		return op_n;
+	};
+	return shgemm(
+			handle,
+			inv_op(op_b),
+			inv_op(op_a),
+			n, m, k,
+			alpha_ptr,
+			b_ptr, ldb,
+			a_ptr, lda,
+			beta_ptr,
+			c_ptr, ldc,
+			compute_type,
+			inv_op(op_c)
+			);
+}
 
 } // namespace shgemm
 } // namespace mtk

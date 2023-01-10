@@ -70,7 +70,8 @@ void test_shgemm_core(
 		const std::size_t m,
 		const std::size_t n,
 		const std::size_t k,
-		const mtk::shgemm::tc_t compute_type
+		const mtk::shgemm::tc_t compute_type,
+		mtk::shgemm::operation_t op_c
 		) {
 	const float alpha = 1.0f, beta = 0.0f;
 	const auto level = mtk::shgemm::shgemm(
@@ -81,8 +82,9 @@ void test_shgemm_core(
 			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
 			b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 			&beta,
-			c_fp32_ptr, m,
-			compute_type
+			c_fp32_ptr, (op_c == mtk::shgemm::op_n ? m : n),
+			compute_type,
+			op_c
 			);
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
 
@@ -91,10 +93,10 @@ void test_shgemm_core(
 			m, n, k,
 			convert_op_shgemm2mateval(op_a),
 			convert_op_shgemm2mateval(op_b),
-			mtk::mateval::col_major,
+			convert_op_shgemm2mateval(op_c),
 			a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
 			b_fp32_ptr, (op_b == mtk::shgemm::op_n ? k : n),
-			c_fp32_ptr, m
+			c_fp32_ptr, (op_c == mtk::shgemm::op_n ? m : n)
 			);
 
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
@@ -108,8 +110,9 @@ void test_shgemm_core(
 				a_fp32_ptr, (op_a == mtk::shgemm::op_n ? m : k),
 				b_fp16_ptr, (op_b == mtk::shgemm::op_n ? k : n),
 				&beta,
-				c_fp32_ptr, m,
-				compute_type
+				c_fp32_ptr, (op_c == mtk::shgemm::op_n ? m : n),
+				compute_type,
+				op_c
 				);
 	}
 	CUTF_CHECK_ERROR(cudaDeviceSynchronize());
@@ -118,11 +121,12 @@ void test_shgemm_core(
 
 	const auto throughput = 2 * m * n * k / elapsed_time * 1e-12; // TFlop/s
 
-	std::printf("%s,%lu,%lu,%lu,%s,%s,%e,%e,%e,%u\n",
+	std::printf("%s,%lu,%lu,%lu,%s,%s,%s,%e,%e,%e,%u\n",
 			(compute_type == mtk::shgemm::fp16 ? "fp16" : "tf32"),
 			m, n, k,
 			op_name_str(op_a).c_str(),
 			op_name_str(op_b).c_str(),
+			op_name_str(op_c).c_str(),
 			error.at(mtk::mateval::max_relative_error),
 			error.at(mtk::mateval::relative_residual),
 			throughput,
@@ -262,57 +266,66 @@ int main() {
 		mtk::shgemm::op_t,
 	};
 
-	std::printf("tc_t,m,n,k,op_a,op_b,residual,relative_max_error,throughput_in_tflops,kernel_level\n");
+	std::vector<mtk::shgemm::operation_t> op_c_list = {
+		mtk::shgemm::op_n,
+		mtk::shgemm::op_t,
+	};
+
+	std::printf("tc_t,m,n,k,op_a,op_b,op_c,residual,relative_max_error,throughput_in_tflops,kernel_level\n");
 	std::fflush(stdout);
-	for (const auto op_a : op_a_list) {
-		for (const auto op_b : op_b_list) {
-			for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
-				const auto m = 1lu << log_M;
-				const auto n = 1lu << log_M;
-				const auto k = 1lu << log_M;
-				test_shgemm_core(
-						shgemm_handle,
-						op_a,
-						op_b,
-						a_fp32_uptr.get(),
-						b_fp32_uptr.get(),
-						b_fp16_uptr.get(),
-						c_fp32_uptr.get(),
-						m, n, k,
-						mtk::shgemm::tf32
-						);
-				test_shgemm_core(
-						shgemm_handle,
-						op_a,
-						op_b,
-						a_fp32_uptr.get(),
-						b_fp32_uptr.get(),
-						b_fp16_uptr.get(),
-						c_fp32_uptr.get(),
-						m, n, k,
-						mtk::shgemm::fp16
-						);
+	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
+		for (const auto op_a : op_a_list) {
+			for (const auto op_b : op_b_list) {
+				for (const auto op_c : op_c_list) {
+					const auto m = 1lu << log_M;
+					const auto n = 1lu << log_M;
+					const auto k = 1lu << log_M;
+					test_shgemm_core(
+							shgemm_handle,
+							op_a,
+							op_b,
+							a_fp32_uptr.get(),
+							b_fp32_uptr.get(),
+							b_fp16_uptr.get(),
+							c_fp32_uptr.get(),
+							m, n, k,
+							mtk::shgemm::tf32,
+							op_c
+							);
+					test_shgemm_core(
+							shgemm_handle,
+							op_a,
+							op_b,
+							a_fp32_uptr.get(),
+							b_fp32_uptr.get(),
+							b_fp16_uptr.get(),
+							c_fp32_uptr.get(),
+							m, n, k,
+							mtk::shgemm::fp16,
+							op_c
+							);
+				}
 #ifdef TEST_ALL
-				test_cublas_core(
-						*cublas_handle_uptr.get(),
-						op_to_cublas(op_a),
-						op_to_cublas(op_b),
-						a_fp32_uptr.get(),
-						b_fp32_uptr.get(),
-						c_fp32_uptr.get(),
-						m, n, k,
-						"TF32"
-						);
-				test_cublas_core(
-						*cublas_handle_uptr.get(),
-						op_to_cublas(op_a),
-						op_to_cublas(op_b),
-						a_fp32_uptr.get(),
-						b_fp32_uptr.get(),
-						c_fp32_uptr.get(),
-						m, n, k,
-						"FP32"
-						);
+					test_cublas_core(
+							*cublas_handle_uptr.get(),
+							op_to_cublas(op_a),
+							op_to_cublas(op_b),
+							a_fp32_uptr.get(),
+							b_fp32_uptr.get(),
+							c_fp32_uptr.get(),
+							m, n, k,
+							"TF32"
+							);
+					test_cublas_core(
+							*cublas_handle_uptr.get(),
+							op_to_cublas(op_a),
+							op_to_cublas(op_b),
+							a_fp32_uptr.get(),
+							b_fp32_uptr.get(),
+							c_fp32_uptr.get(),
+							m, n, k,
+							"FP32"
+							);
 #endif
 			}
 		}

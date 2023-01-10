@@ -81,13 +81,23 @@ __global__ void shgemm_kernel(
 	float* const c_smem_ptr = smem;
 	for (unsigned matrix_id_offset = 0; matrix_id_offset < num_submatrices; matrix_id_offset += BLOCK_SIZE / mtk::shgemm::utils::warp_size) {
 		const unsigned matrix_id = matrix_id_offset + (threadIdx.x / mtk::shgemm::utils::warp_size);
-		const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
-		const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
-		mtk::wmma::tcec::store_matrix_sync(
-				c_smem_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * (SMEM_M + mtk::shgemm::device::C_smem_skew),
-				frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
-				SMEM_M + mtk::shgemm::device::C_smem_skew,
-				nvcuda::wmma::mem_col_major);
+		if constexpr (std::is_same<typename C_DMEM_STORER::layout, mtk::shgemm::utils::col_major>::value) {
+			const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
+			const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
+			mtk::wmma::tcec::store_matrix_sync(
+					c_smem_ptr + matrix_id_m * FRAG_M + matrix_id_n * FRAG_N * (SMEM_M + mtk::shgemm::device::C_smem_skew),
+					frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
+					SMEM_M + mtk::shgemm::device::C_smem_skew,
+					nvcuda::wmma::mem_col_major);
+		} else {
+			const unsigned matrix_id_m = matrix_id % (SMEM_M / FRAG_M);
+			const unsigned matrix_id_n = matrix_id / (SMEM_M / FRAG_M);
+			mtk::wmma::tcec::store_matrix_sync(
+					c_smem_ptr + matrix_id_n * FRAG_N + matrix_id_m * FRAG_M * (SMEM_N + mtk::shgemm::device::C_smem_skew),
+					frag_c[matrix_id_offset / (BLOCK_SIZE / mtk::shgemm::utils::warp_size)],
+					SMEM_N + mtk::shgemm::device::C_smem_skew,
+					nvcuda::wmma::mem_row_major);
+		}
 	}
 
 	// Store smem C to dmem
@@ -172,12 +182,14 @@ template<
 	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
-	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
+	mtk::shgemm::operation_t op_a,
+	mtk::shgemm::operation_t op_b,
+	mtk::shgemm::operation_t op_c
 	>
 struct kernel_ptr {
 	using A_DMEM_LOADER = typename loader_selector<op_a, float, SMEM_M, SMEM_K, BLOCK_SIZE>::type;
 	using B_DMEM_LOADER = typename loader_selector<op_b, half , SMEM_K, SMEM_N, BLOCK_SIZE>::type;
-	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
+	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer<op_c, float, SMEM_M, SMEM_N, BLOCK_SIZE>;
 	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
 
 	constexpr static mtk::shgemm::detail::kernel_func_t func =
@@ -206,12 +218,14 @@ template<
 	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
-	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
+	mtk::shgemm::operation_t op_a,
+	mtk::shgemm::operation_t op_b,
+	mtk::shgemm::operation_t op_c
 	>
 struct atomic_kernel_ptr {
 	using A_DMEM_LOADER = typename loader_selector<op_a, float, SMEM_M, SMEM_K, BLOCK_SIZE>::type;
 	using B_DMEM_LOADER = typename loader_selector<op_b, half , SMEM_K, SMEM_N, BLOCK_SIZE>::type;
-	using C_DMEM_STORER = mtk::shgemm::device::dmem_atomic_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
+	using C_DMEM_STORER = mtk::shgemm::device::dmem_atomic_storer<op_c, float, SMEM_M, SMEM_N, BLOCK_SIZE>;
 	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
 
 	constexpr static mtk::shgemm::detail::kernel_func_t func =
@@ -240,12 +254,14 @@ template<
 	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
-	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
+	mtk::shgemm::operation_t op_a,
+	mtk::shgemm::operation_t op_b,
+	mtk::shgemm::operation_t op_c
 	>
 struct pipline_kernel_ptr {
 	using A_DMEM_LOADER = typename loader_selector<op_a, float, SMEM_M, SMEM_K, BLOCK_SIZE>::type;
 	using B_DMEM_LOADER = typename loader_selector<op_b, half , SMEM_K, SMEM_N, BLOCK_SIZE>::type;
-	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
+	using C_DMEM_STORER = mtk::shgemm::device::dmem_storer<op_c, float, SMEM_M, SMEM_N, BLOCK_SIZE>;
 	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
 
 	constexpr static mtk::shgemm::detail::kernel_func_t func =
@@ -274,12 +290,14 @@ template<
 	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
-	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b
+	mtk::shgemm::operation_t op_a,
+	mtk::shgemm::operation_t op_b,
+	mtk::shgemm::operation_t op_c
 	>
 struct atomic_pipline_kernel_ptr {
 	using A_DMEM_LOADER = typename loader_selector<op_a, float, SMEM_M, SMEM_K, BLOCK_SIZE>::type;
 	using B_DMEM_LOADER = typename loader_selector<op_b, half , SMEM_K, SMEM_N, BLOCK_SIZE>::type;
-	using C_DMEM_STORER = mtk::shgemm::device::dmem_atomic_storer_n<float, SMEM_M, SMEM_N, BLOCK_SIZE>;
+	using C_DMEM_STORER = mtk::shgemm::device::dmem_atomic_storer<op_c, float, SMEM_M, SMEM_N, BLOCK_SIZE>;
 	using SHGEMM_CORE = mtk::shgemm::device::shgemm_core_pipeline<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, BLOCK_SIZE, TC_T, typename A_DMEM_LOADER::layout, typename B_DMEM_LOADER::layout>;
 
 	constexpr static mtk::shgemm::detail::kernel_func_t func =
@@ -313,7 +331,9 @@ template<
 	unsigned NUM_UNROLLINGS,
 	unsigned BLOCK_SIZE,
 	class TC_T,
-	mtk::shgemm::operation_t op_a, mtk::shgemm::operation_t op_b,
+	mtk::shgemm::operation_t op_a,
+	mtk::shgemm::operation_t op_b,
+	mtk::shgemm::operation_t op_c,
 	unsigned USE_PIPELINE_CORE,
 	unsigned USE_ATOMIC_STORER
 	>
@@ -324,15 +344,15 @@ void set_kernel(
 	mtk::shgemm::detail::kernel_func_t func;
 	if constexpr (USE_ATOMIC_STORER) {
 		if constexpr (USE_PIPELINE_CORE) {
-			func = atomic_pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+			func = atomic_pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b, op_c>::func;
 		} else {
-			func = atomic_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+			func = atomic_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b, op_c>::func;
 		}
 	} else {
 		if constexpr (USE_PIPELINE_CORE) {
-			func = pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+			func = pipline_kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b, op_c>::func;
 		} else {
-			func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b>::func;
+			func = kernel_ptr<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, 2, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b, op_c>::func;
 		}
 	}
 	const unsigned smem_size = get_shared_memory_size_in_byte<SMEM_M, SMEM_N, SMEM_K, NUM_STAGES, typename op_t2layout<op_a>::type, typename op_t2layout<op_b>::type>();
@@ -349,6 +369,31 @@ void set_kernel(
 	kernel.smem_k = SMEM_K;
 	kernel.block_size = BLOCK_SIZE;
 	kernel.smem_size = smem_size;
+}
+
+template<
+	unsigned SMEM_M,
+	unsigned SMEM_N,
+	unsigned SMEM_K,
+	unsigned FRAG_M,
+	unsigned FRAG_N,
+	unsigned FRAG_K,
+	unsigned NUM_STAGES,
+	unsigned NUM_UNROLLINGS,
+	unsigned BLOCK_SIZE,
+	class TC_T,
+	mtk::shgemm::operation_t op_a,
+	mtk::shgemm::operation_t op_b,
+	unsigned USE_PIPELINE_CORE,
+	unsigned USE_ATOMIC_STORER
+	>
+void set_nt_kernels(
+		mtk::shgemm::detail::kernel& n_kernel,
+		mtk::shgemm::detail::kernel& t_kernel,
+		const unsigned num_sm
+		) {
+	set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b, mtk::shgemm::op_n, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(n_kernel, num_sm);
+	set_kernel<SMEM_M, SMEM_N, SMEM_K, FRAG_M, FRAG_N, FRAG_K, NUM_STAGES, NUM_UNROLLINGS, BLOCK_SIZE, TC_T, op_a, op_b, mtk::shgemm::op_t, USE_PIPELINE_CORE, USE_ATOMIC_STORER>(t_kernel, num_sm);
 }
 } // noname namespace
 
@@ -375,33 +420,35 @@ void mtk::shgemm::create(
 	const unsigned num_sm = prop.multiProcessorCount;
 
 	// TF32
-	set_kernel<  32,  64,  64, 16,  32,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<  64,  64,  32, 16,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<  32, 128,  64, 32,  32,  64, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel< 128, 128,  64, 32,  64,  32, 2, 2, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel<  64, 128,  64, 32,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel<  64, 128,  64, 32,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_nt_kernels<  32,  64,  64, 16,  32,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P0], handle.tf32_nn_t_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_nt_kernels<  64,  64,  32, 16,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P0], handle.tf32_nt_t_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_nt_kernels<  32, 128,  64, 32,  32,  64, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P0], handle.tf32_tn_t_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_nt_kernels<  32, 128,  64, 16,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P0], handle.tf32_tt_t_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_nt_kernels< 128, 128,  64, 32,  64,  32, 2, 2, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.tf32_nn_kernel[mtk::shgemm::detail::P1], handle.tf32_nn_t_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_nt_kernels<  64, 128,  64, 32,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.tf32_nt_kernel[mtk::shgemm::detail::P1], handle.tf32_nt_t_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_nt_kernels< 128, 128,  64, 32,  64,  32, 2, 1, 256, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.tf32_tn_kernel[mtk::shgemm::detail::P1], handle.tf32_tn_t_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_nt_kernels<  64, 128,  64, 32,  64,  32, 2, 1, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.tf32_tt_kernel[mtk::shgemm::detail::P1], handle.tf32_tt_t_kernel[mtk::shgemm::detail::P1], num_sm);
 	// FP16
-	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<  32,  64,  64, 16,  32,  32, 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P0], num_sm);
-	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel< 128, 128,  32, 16,  16,  32, 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P1], num_sm);
-	set_kernel< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_nt_kernels<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P0], handle.fp16_nn_t_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_nt_kernels<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P0], handle.fp16_nt_t_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_nt_kernels<  32,  64,  64, 16,  32,  32, 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P0], handle.fp16_tn_t_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_nt_kernels<  32, 128,  64, 16,  64,  32, 2, 1, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P0], handle.fp16_tt_t_kernel[mtk::shgemm::detail::P0], num_sm);
+	set_nt_kernels< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 0>(handle.fp16_nn_kernel[mtk::shgemm::detail::P1], handle.fp16_nn_t_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_nt_kernels< 128, 128,  32, 16,  16,  32, 2, 1, 256, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 0>(handle.fp16_nt_kernel[mtk::shgemm::detail::P1], handle.fp16_nt_t_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_nt_kernels< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 0>(handle.fp16_tn_kernel[mtk::shgemm::detail::P1], handle.fp16_tn_t_kernel[mtk::shgemm::detail::P1], num_sm);
+	set_nt_kernels< 128, 128,  64, 32,  64,  32, 2, 1, 256, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 0>(handle.fp16_tt_kernel[mtk::shgemm::detail::P1], handle.fp16_tt_t_kernel[mtk::shgemm::detail::P1], num_sm);
 
-	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 1>(handle.tf32_nn_k_slicing_kernel, num_sm);
-	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 1>(handle.tf32_tn_k_slicing_kernel, num_sm);
-	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 1>(handle.tf32_nt_k_slicing_kernel, num_sm);
-	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 1>(handle.tf32_tt_k_slicing_kernel, num_sm);
+	// TF32
+	set_nt_kernels<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 1>(handle.tf32_nn_k_slicing_kernel, handle.tf32_nn_t_k_slicing_kernel, num_sm);
+	set_nt_kernels<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 1>(handle.tf32_tn_k_slicing_kernel, handle.tf32_tn_t_k_slicing_kernel, num_sm);
+	set_nt_kernels<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 1>(handle.tf32_nt_k_slicing_kernel, handle.tf32_nt_t_k_slicing_kernel, num_sm);
+	set_nt_kernels<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, nvcuda::wmma::precision::tf32, mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 1>(handle.tf32_tt_k_slicing_kernel, handle.tf32_tt_t_k_slicing_kernel, num_sm);
 
-	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 1>(handle.fp16_nn_k_slicing_kernel, num_sm);
-	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 1>(handle.fp16_tn_k_slicing_kernel, num_sm);
-	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 1>(handle.fp16_nt_k_slicing_kernel, num_sm);
-	set_kernel<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 1>(handle.fp16_tt_k_slicing_kernel, num_sm);
+	//FP16
+	set_nt_kernels<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_n, 0, 1>(handle.fp16_nn_k_slicing_kernel, handle.fp16_nn_t_k_slicing_kernel, num_sm);
+	set_nt_kernels<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_n, 0, 1>(handle.fp16_tn_k_slicing_kernel, handle.fp16_tn_t_k_slicing_kernel, num_sm);
+	set_nt_kernels<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_n, mtk::shgemm::op_t, 0, 1>(handle.fp16_nt_k_slicing_kernel, handle.fp16_nt_t_k_slicing_kernel, num_sm);
+	set_nt_kernels<64 , 64 , 64 , 32 , 32 , 64 , 2, 4, 128, half                         , mtk::shgemm::op_t, mtk::shgemm::op_t, 0, 1>(handle.fp16_tt_k_slicing_kernel, handle.fp16_tt_t_k_slicing_kernel, num_sm);
 }
 
 void mtk::shgemm::destroy(
@@ -441,22 +488,39 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 		const half * const b_ptr, const std::size_t ldb,
 		const float* const beta_ptr,
 		float* const c_ptr, const std::size_t ldc,
-		const tc_t compute_type
+		const tc_t compute_type,
+		const mtk::shgemm::operation_t op_c
 		) {
 	if (m * n <= handle.max_working_memory_num_elements && k >= 4096 && *beta_ptr == 0.f) {
 		mtk::shgemm::detail::kernel kernel;
-		if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
-			if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_nn_k_slicing_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_nn_k_slicing_kernel;}
-		} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
-			if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_tn_k_slicing_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_tn_k_slicing_kernel;}
-		} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
-			if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_nt_k_slicing_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_nt_k_slicing_kernel;}
-		} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
-			if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_tt_k_slicing_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_tt_k_slicing_kernel;}
+		if (op_c == mtk::shgemm::op_n) {
+			if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_nn_k_slicing_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_nn_k_slicing_kernel;}
+			} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_tn_k_slicing_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_tn_k_slicing_kernel;}
+			} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_nt_k_slicing_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_nt_k_slicing_kernel;}
+			} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_tt_k_slicing_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_tt_k_slicing_kernel;}
+			}
+		} else {
+			if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_nn_t_k_slicing_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_nn_t_k_slicing_kernel;}
+			} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_tn_t_k_slicing_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_tn_t_k_slicing_kernel;}
+			} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_nt_t_k_slicing_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_nt_t_k_slicing_kernel;}
+			} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel = handle.fp16_tt_t_k_slicing_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel = handle.tf32_tt_t_k_slicing_kernel;}
+			}
 		}
 
 		const auto num_blocks = ((m + kernel.smem_m - 1) / kernel.smem_m) * ((n + kernel.smem_n - 1) / kernel.smem_n);
@@ -508,18 +572,34 @@ mtk::shgemm::detail::kernel_level mtk::shgemm::shgemm(
 
 	} else {
 		mtk::shgemm::detail::kernel* kernel_list = nullptr;
-		if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
-			if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nn_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nn_kernel;}
-		} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
-			if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_tn_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tn_kernel;}
-		} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
-			if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nt_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nt_kernel;}
-		} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
-			if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_tt_kernel;
-			} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tt_kernel;}
+		if (op_c == mtk::shgemm::op_n) {
+			if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nn_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nn_kernel;}
+			} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_tn_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tn_kernel;}
+			} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nt_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nt_kernel;}
+			} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_tt_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tt_kernel;}
+			}
+		} else {
+			if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_n) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nn_t_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nn_t_kernel;}
+			} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_n) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_tn_t_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tn_t_kernel;}
+			} else if (op_a == mtk::shgemm::op_n && op_b == mtk::shgemm::op_t) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_nt_t_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_nt_t_kernel;}
+			} else if (op_a == mtk::shgemm::op_t && op_b == mtk::shgemm::op_t) {
+				if (compute_type == mtk::shgemm::fp16) {        kernel_list = (mtk::shgemm::detail::kernel*)handle.fp16_tt_t_kernel;
+				} else if (compute_type == mtk::shgemm::tf32) { kernel_list = (mtk::shgemm::detail::kernel*)handle.tf32_tt_t_kernel;}
+			}
 		}
 
 		// larger value is for larger shape
