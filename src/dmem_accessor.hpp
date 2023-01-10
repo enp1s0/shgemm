@@ -315,6 +315,44 @@ struct dmem_storer_n {
 	}
 };
 
+template <mtk::shgemm::operation_t op, class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct dmem_storer {
+	__device__ void operator()(
+			T* const dmem_ptr, const unsigned ldd,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
+			const T* const smem_ptr,
+			const float alpha, const float beta
+			) {
+		dmem_storer_n<T, SMEM_M, SMEM_N, BLOCK_SIZE>{}(
+				dmem_ptr, ldd,
+				dmem_start_m, dmem_start_n,
+				dmem_size_m, dmem_size_n,
+				smem_ptr,
+				alpha, beta
+				);
+	}
+};
+
+template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct dmem_storer<mtk::shgemm::op_t, T, SMEM_M, SMEM_N, BLOCK_SIZE> {
+	__device__ void operator()(
+			T* const dmem_ptr, const unsigned ldd,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
+			const T* const smem_ptr,
+			const float alpha, const float beta
+			) {
+		dmem_storer_n<T, SMEM_N, SMEM_M, BLOCK_SIZE>{}(
+				dmem_ptr, ldd,
+				dmem_start_n, dmem_start_m,
+				dmem_size_n, dmem_size_m,
+				smem_ptr,
+				alpha, beta
+				);
+	}
+};
+
 // -----------------------------------------
 // N - atomic storer
 // -----------------------------------------
@@ -340,6 +378,44 @@ struct dmem_atomic_storer_n {
 
 			atomicAdd(&dmem_ptr[dmem_index], smem_ptr[smem_index] * alpha);
 		}
+	}
+};
+
+template <mtk::shgemm::operation_t op, class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct dmem_atomic_storer {
+	__device__ void operator()(
+			T* const dmem_ptr, const unsigned ldd,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
+			const T* const smem_ptr,
+			const float alpha, const float beta
+			) {
+		dmem_atomic_storer_n<T, SMEM_M, SMEM_N, BLOCK_SIZE>{}(
+				dmem_ptr, ldd,
+				dmem_start_m, dmem_start_n,
+				dmem_size_m, dmem_size_n,
+				smem_ptr,
+				alpha, beta
+				);
+	}
+};
+
+template <class T, unsigned SMEM_M, unsigned SMEM_N, unsigned BLOCK_SIZE>
+struct dmem_atomic_storer<mtk::shgemm::op_t, T, SMEM_M, SMEM_N, BLOCK_SIZE> {
+	__device__ void operator()(
+			T* const dmem_ptr, const unsigned ldd,
+			const unsigned dmem_start_m, const unsigned dmem_start_n,
+			const unsigned dmem_size_m, const unsigned dmem_size_n,
+			const T* const smem_ptr,
+			const float alpha, const float beta
+			) {
+		dmem_atomic_storer_n<T, SMEM_N, SMEM_M, BLOCK_SIZE>{}(
+				dmem_ptr, ldd,
+				dmem_start_n, dmem_start_m,
+				dmem_size_n, dmem_size_m,
+				smem_ptr,
+				alpha, beta
+				);
 	}
 };
 } // namespace device
