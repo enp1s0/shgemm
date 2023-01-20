@@ -360,7 +360,8 @@ void set_kernel(
 	int max_block_per_ms;
 	CUTF_CHECK_ERROR(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&max_block_per_ms, *func, BLOCK_SIZE, smem_size));
 
-	CUTF_CHECK_ERROR(cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+	CUTF_CHECK_ERROR_M(cudaFuncSetAttribute(func, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size),
+			std::string("smem size = ") + std::to_string(smem_size));
 
 	kernel.func = func;
 	kernel.num_blocks_filling = std::max(1, max_block_per_ms) * num_sm;
