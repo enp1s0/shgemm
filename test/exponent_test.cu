@@ -5,7 +5,6 @@
 #include <cutf/curand.hpp>
 #include <mateval/comparison_cuda.hpp>
 #include <shgemm/shgemm.hpp>
-#include <cublas.h>
 #include <cublas_v2.h>
 
 //#define ENABLE_CUBLAS_TEST
@@ -314,6 +313,6 @@ int main() {
 		}
 	}
 
-	cublasFree(cublas_handle);
+	cublasDestroy(cublas_handle);
 	mtk::shgemm::destroy(shgemm_handle);
 }
