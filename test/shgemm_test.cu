@@ -274,12 +274,12 @@ int main() {
 	std::printf("tc_t,m,n,k,op_a,op_b,op_c,residual,relative_max_error,throughput_in_tflops,kernel_level\n");
 	std::fflush(stdout);
 	for (std::size_t log_M = min_log_DIM; log_M <= max_log_DIM; log_M += log_DIM_interval) {
+		const auto m = 1lu << log_M;
+		const auto n = 1lu << log_M;
+		const auto k = 1lu << log_M;
 		for (const auto op_a : op_a_list) {
 			for (const auto op_b : op_b_list) {
 				for (const auto op_c : op_c_list) {
-					const auto m = 1lu << log_M;
-					const auto n = 1lu << log_M;
-					const auto k = 1lu << log_M;
 					test_shgemm_core(
 							shgemm_handle,
 							op_a,
