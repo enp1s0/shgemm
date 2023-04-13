@@ -2,8 +2,9 @@
 
 ## Build
 ```
-git clone https://github.com/enp1s0/shgemm --recursive
+git clone https://github.com/enp1s0/shgemm
 cd shgemm
+git submodule update --init --recursive
 
 mkdir build
 cd build
